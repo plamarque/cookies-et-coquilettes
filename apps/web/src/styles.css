@@ -457,7 +457,7 @@ body {
 
 .ingredient-row {
   display: grid;
-  grid-template-columns: 8ch minmax(0, 1fr) 7ch auto;
+  grid-template-columns: minmax(0, 1fr) 8ch 7ch auto;
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.5rem;

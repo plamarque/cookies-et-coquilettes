@@ -1225,18 +1225,18 @@ onMounted(async () => {
       <h3>Ingrédients</h3>
       <div v-for="ingredient in form.ingredients" :key="ingredient.id" class="ingredient-row">
         <input
-          v-model="ingredient.quantity"
-          type="text"
-          placeholder="Qté"
-          class="ingredient-qty-input"
-          :aria-label="`ingredient-quantity-${ingredient.id}`"
-        />
-        <input
           v-model="ingredient.label"
           type="text"
           placeholder="Nom ingrédient"
           class="ingredient-label-input"
           :aria-label="`ingredient-label-${ingredient.id}`"
+        />
+        <input
+          v-model="ingredient.quantity"
+          type="text"
+          placeholder="Qté"
+          class="ingredient-qty-input"
+          :aria-label="`ingredient-quantity-${ingredient.id}`"
         />
         <input
           v-model="ingredient.unit"
