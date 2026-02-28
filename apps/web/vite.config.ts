@@ -6,6 +6,10 @@ const basePath = process.env.VITE_BASE_PATH || "/";
 
 export default defineConfig({
   base: basePath,
+  server: {
+    host: true, // expose on 0.0.0.0 for local network access
+    port: 5173
+  },
   plugins: [
     vue(),
     VitePWA({

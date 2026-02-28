@@ -42,12 +42,14 @@ npm run screenshots
 
 Le front est servi par défaut sur `http://localhost:5173` et le BFF sur `http://localhost:8787`.
 
+L’app est aussi exposée sur le réseau local (0.0.0.0) : au lancement, le script affiche l’URL réseau (ex. `http://192.168.1.x:5173`) pour accéder depuis un téléphone ou une tablette sur le même WiFi.
+
 ## Variables d’environnement
 
 Copier `.env.example` vers `.env` pour le local puis adapter les valeurs.
 
 - Front : `VITE_BFF_URL`, `VITE_BASE_PATH`
-- BFF : `OPENAI_API_KEY`, `CORS_ORIGIN`
+- BFF : `OPENAI_API_KEY` (parsing + génération d'images DALL-E), `CORS_ORIGIN`
 
 ## Prérequis E2E / screenshots
 
