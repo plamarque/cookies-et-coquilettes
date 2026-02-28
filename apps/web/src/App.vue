@@ -10,7 +10,6 @@ import type {
   RecipeCategory,
   RecipeFilters
 } from "@cookies-et-coquilettes/domain";
-import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
 import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
@@ -278,12 +277,7 @@ const activeFilters = computed<RecipeFilters>(() => ({
 }));
 
 const canSaveForm = computed(() => {
-  const candidate = formToRecipe(
-    formMode.value === "EDIT" && formRecipeId.value
-      ? recipes.value.find((recipe) => recipe.id === formRecipeId.value)
-      : undefined
-  );
-  return isRecipeValidForSave(candidate);
+  return form.value.title.trim().length > 0;
 });
 
 const formSourceUrl = computed({
@@ -639,6 +633,13 @@ async function saveForm(): Promise<void> {
         ? recipes.value.find((recipe) => recipe.id === formRecipeId.value)
         : undefined;
     let recipe = formToRecipe(existing);
+
+    if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
+      recipe = {
+        ...recipe,
+        steps: [{ id: randomId(), order: 1, text: "À compléter" }]
+      };
+    }
 
     if (!recipe.imageId && form.value.imageUrl) {
       const imageId = await storeImageFromUrl(form.value.imageUrl);
