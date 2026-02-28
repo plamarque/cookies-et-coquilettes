@@ -1017,38 +1017,53 @@ onMounted(async () => {
           </button>
         </div>
       </div>
-      <div class="row between">
-        <h2>{{ selectedRecipe.title }}</h2>
-        <div class="row">
+      <div class="recipe-detail-meta">
+        <h2 class="recipe-detail-title">{{ selectedRecipe.title }}</h2>
+        <div class="recipe-detail-actions" role="group" aria-label="Actions de la recette">
           <Button
             :icon="cookingState === 'OFF' ? 'pi pi-play' : 'pi pi-sun'"
             label="Cuisiner"
             text
+            size="small"
+            class="recipe-detail-action"
+            aria-label="Activer ou désactiver le mode cuisine"
             :title="cookingState === 'OFF' ? 'Activer mode cuisine' : 'Désactiver mode cuisine'"
             @click="toggleCookingMode"
           />
-          <Button label="Éditer" text icon="pi pi-pencil" @click="openEditForm(selectedRecipe)" />
+          <Button
+            label="Éditer"
+            text
+            icon="pi pi-pencil"
+            size="small"
+            class="recipe-detail-action"
+            aria-label="Éditer la recette"
+            @click="openEditForm(selectedRecipe)"
+          />
           <Button
             severity="danger"
             text
+            size="small"
             icon="pi pi-trash"
             label="Supprimer"
+            class="recipe-detail-action"
+            aria-label="Supprimer la recette"
             @click="deleteRecipe(selectedRecipe)"
           />
+          <a
+            v-if="selectedRecipe.source?.url"
+            :href="selectedRecipe.source.url"
+            target="_blank"
+            rel="noopener"
+            class="recipe-detail-action-link"
+            aria-label="Voir la recette originale"
+          >
+            <i class="pi pi-external-link" />
+            <span class="recipe-detail-action-label">Source</span>
+          </a>
         </div>
       </div>
 
-      <a
-        v-if="selectedRecipe.source?.url"
-        :href="selectedRecipe.source.url"
-        target="_blank"
-        rel="noopener"
-        class="source-link"
-      >
-        <i class="pi pi-external-link" />
-        Voir la recette originale
-      </a>
-      <p v-else-if="selectedRecipe.source" class="source-hint">
+      <p v-if="selectedRecipe.source && !selectedRecipe.source.url" class="source-hint">
         <i class="pi pi-paperclip" />
         Source : {{ sourceTypeLabel(selectedRecipe.source) }}
       </p>
