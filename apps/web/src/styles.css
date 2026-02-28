@@ -19,42 +19,6 @@ body {
   padding: 1rem;
 }
 
-.hero {
-  border: 1px solid rgba(31, 79, 70, 0.15);
-  border-radius: 1rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 18px 36px rgba(29, 31, 28, 0.08);
-}
-
-.hero h1 {
-  margin: 0.25rem 0;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #1f4f46;
-  letter-spacing: 0.08em;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 1rem;
-}
-
-.stats {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -71,12 +35,51 @@ body {
   border: 1px dashed rgba(31, 79, 70, 0.45);
 }
 
-.layout-grid {
-  display: grid;
-  grid-template-columns: minmax(320px, 380px) 1fr;
+.list-view {
+  margin-top: 0.5rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1rem;
-  align-items: start;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.toolbar .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-input {
+  max-width: 200px;
+  min-width: 120px;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.hidden-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .panel {
@@ -87,9 +90,17 @@ body {
 }
 
 .detail,
-.form-panel {
+.form-panel,
+.add-choice-panel {
   margin-top: 1rem;
   padding: 1rem;
+}
+
+.add-choice-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .stack {
@@ -166,6 +177,16 @@ select {
   border-radius: 0.55rem;
   font: inherit;
   background: white;
+  color: #1d1f1c;
+}
+
+.paste-field {
+  background: #fff !important;
+  color: #1d1f1c !important;
+}
+
+.paste-field::placeholder {
+  color: #6b7280;
 }
 
 .muted {
@@ -173,10 +194,6 @@ select {
 }
 
 @media (max-width: 900px) {
-  .layout-grid {
-    grid-template-columns: 1fr;
-  }
-
   .ingredient-row {
     grid-template-columns: 1fr 1fr;
   }

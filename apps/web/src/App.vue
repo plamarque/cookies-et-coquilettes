@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
-import Chip from "primevue/chip";
 import Tag from "primevue/tag";
 import type {
   ImportSource,
@@ -16,7 +15,7 @@ import { dexieRecipeService } from "./services/recipe-service";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService } from "./services/import-service";
 
-type ViewMode = "LIST" | "DETAIL" | "FORM";
+type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT" | "IMPORT_REVIEW";
 
 interface IngredientInput {
@@ -57,9 +56,8 @@ const search = ref("");
 const categoryFilter = ref<"ALL" | RecipeCategory>("ALL");
 const favoriteOnly = ref(false);
 
-const importUrl = ref("");
-const importText = ref("");
-const importFile = ref<File | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const pasteFieldContent = ref("");
 const importBusy = ref(false);
 
 const servingsInput = ref("");
@@ -262,6 +260,100 @@ const canSaveForm = computed(() => {
   return isRecipeValidForSave(candidate);
 });
 
+function openAddChoice(): void {
+  clearMessages();
+  pasteFieldContent.value = "";
+  viewMode.value = "ADD_CHOICE";
+}
+
+function closeAddChoice(): void {
+  clearMessages();
+  pasteFieldContent.value = "";
+  viewMode.value = "LIST";
+}
+
+function triggerFilePick(): void {
+  fileInputRef.value?.click();
+}
+
+function isLikelyUrl(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  try {
+    new URL(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runImportFromPasteField(): Promise<void> {
+  const content = pasteFieldContent.value.trim();
+  if (!content) {
+    setError(new Error("Collez une URL ou du texte à importer."));
+    return;
+  }
+
+  clearMessages();
+  importBusy.value = true;
+  try {
+    let draft: ParsedRecipeDraft;
+    if (isLikelyUrl(content)) {
+      draft = await bffImportService.importFromUrl(content);
+    } else {
+      draft = await bffImportService.importFromText(content);
+    }
+    pasteFieldContent.value = "";
+    openImportReview(draft);
+  } catch (error) {
+    setError(error);
+  } finally {
+    importBusy.value = false;
+  }
+}
+
+function onPasteInField(ev: ClipboardEvent): void {
+  const data = ev.clipboardData;
+  if (!data) return;
+
+  const imageType = [...data.types].find((t) => t.startsWith("image/"));
+  if (imageType) {
+    ev.preventDefault();
+    const file = data.files?.[0];
+    if (file) {
+      runImportFromFile(file);
+    }
+  }
+}
+
+async function runImportFromFile(file: File): Promise<void> {
+  clearMessages();
+  importBusy.value = true;
+  try {
+    let draft: ParsedRecipeDraft;
+    if (file.type.startsWith("image/")) {
+      draft = await bffImportService.importFromScreenshot(file);
+    } else {
+      const text = await file.text();
+      draft = await bffImportService.importFromText(text);
+    }
+    openImportReview(draft);
+  } catch (error) {
+    setError(error);
+  } finally {
+    importBusy.value = false;
+  }
+}
+
+function onFilePicked(event: Event): void {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    runImportFromFile(file);
+  }
+  target.value = "";
+}
+
 async function refresh(): Promise<void> {
   recipes.value = await dexieRecipeService.listRecipes(activeFilters.value);
   if (selectedRecipeId.value) {
@@ -296,8 +388,9 @@ function openCreateForm(): void {
   viewMode.value = "FORM";
 }
 
-function openEditForm(recipe: Recipe): void {
+async function openEditForm(recipe: Recipe): Promise<void> {
   clearMessages();
+  await stopCookingModeIfActive();
   formMode.value = "EDIT";
   formRecipeId.value = recipe.id;
   form.value = toForm(recipe);
@@ -323,8 +416,11 @@ function openDetail(recipe: Recipe): void {
   viewMode.value = "DETAIL";
 }
 
-function backToList(): void {
+async function backToList(): Promise<void> {
   clearMessages();
+  if (viewMode.value === "DETAIL") {
+    await stopCookingModeIfActive();
+  }
   viewMode.value = "LIST";
   formRecipeId.value = null;
 }
@@ -390,6 +486,7 @@ async function deleteRecipe(recipe: Recipe): Promise<void> {
 
   try {
     await dexieRecipeService.deleteRecipe(recipe.id);
+    await stopCookingModeIfActive();
     feedback.value = "Recette supprimée.";
     selectedRecipeId.value = null;
     viewMode.value = "LIST";
@@ -435,6 +532,18 @@ async function resetServings(recipe: Recipe): Promise<void> {
   await scaleToInput(recipe);
 }
 
+async function stopCookingModeIfActive(): Promise<void> {
+  if (cookingState.value !== "OFF") {
+    try {
+      await browserCookingModeService.stopCookingMode();
+      cookingState.value = "OFF";
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("stopCookingMode failed", error);
+    }
+  }
+}
+
 async function toggleCookingMode(): Promise<void> {
   clearMessages();
   try {
@@ -456,35 +565,6 @@ async function toggleCookingMode(): Promise<void> {
   }
 }
 
-async function runImport(kind: "URL" | "TEXT" | "SCREENSHOT"): Promise<void> {
-  clearMessages();
-  importBusy.value = true;
-  try {
-    let draft: ParsedRecipeDraft;
-    if (kind === "URL") {
-      draft = await bffImportService.importFromUrl(importUrl.value.trim());
-    } else if (kind === "TEXT") {
-      draft = await bffImportService.importFromText(importText.value.trim());
-    } else {
-      if (!importFile.value) {
-        throw new Error("Sélectionne une image.");
-      }
-      draft = await bffImportService.importFromScreenshot(importFile.value);
-    }
-
-    openImportReview(draft);
-  } catch (error) {
-    setError(error);
-  } finally {
-    importBusy.value = false;
-  }
-}
-
-function onImportFileChanged(event: Event): void {
-  const target = event.target as HTMLInputElement;
-  importFile.value = target.files?.[0] ?? null;
-}
-
 onMounted(async () => {
   await refresh();
 });
@@ -492,94 +572,51 @@ onMounted(async () => {
 
 <template>
   <main class="app-shell">
-    <header class="hero">
-      <p class="eyebrow">v1 solo local · offline-first</p>
-      <h1>Cookies &amp; Coquillettes</h1>
-      <p>Recettes locales, import assisté, recherche rapide et mode cuisine.</p>
-      <div class="hero-actions">
-        <Button
-          :label="cookingState === 'OFF' ? 'Activer mode cuisine' : 'Désactiver mode cuisine'"
-          :icon="cookingState === 'OFF' ? 'pi pi-moon' : 'pi pi-sun'"
-          @click="toggleCookingMode"
-        />
-        <Button label="Nouvelle recette" icon="pi pi-plus" @click="openCreateForm" />
-      </div>
-    </header>
-
-    <section class="stats">
-      <Chip :label="`${recipes.length} recette(s)`" icon="pi pi-book" />
-      <Chip :label="`${favoriteCount} favori(s)`" icon="pi pi-heart" />
-      <Tag v-if="cookingState !== 'OFF'" severity="success" :value="cookingState" />
-    </section>
-
     <section v-if="errorMessage" class="message error">{{ errorMessage }}</section>
     <section v-else-if="feedback" class="message success">{{ feedback }}</section>
 
-    <section v-if="viewMode === 'LIST'" class="layout-grid">
-      <Card class="panel">
-        <template #title>Import assisté</template>
-        <template #content>
-          <div class="stack">
-            <label for="import-url">URL</label>
-            <input id="import-url" v-model="importUrl" type="url" placeholder="https://..." />
+    <section v-if="viewMode === 'LIST'" class="list-view">
+      <div class="toolbar">
+        <div class="filters">
+          <input
+            id="search"
+            v-model="search"
+            type="search"
+            placeholder="Rechercher..."
+            class="search-input"
+          />
+          <div class="filter-chips">
             <Button
-              label="Importer depuis URL"
-              icon="pi pi-link"
-              :disabled="importBusy || !importUrl.trim()"
-              @click="runImport('URL')"
-            />
-          </div>
-
-          <div class="stack">
-            <label for="import-text">Texte collé</label>
-            <textarea
-              id="import-text"
-              v-model="importText"
-              rows="4"
-              placeholder="Colle une recette brute ici..."
+              :severity="favoriteOnly ? 'primary' : 'secondary'"
+              :label="`Favoris (${favoriteCount})`"
+              size="small"
+              icon="pi pi-heart"
+              @click="favoriteOnly = !favoriteOnly"
             />
             <Button
-              label="Importer depuis texte"
-              icon="pi pi-file-edit"
-              :disabled="importBusy || !importText.trim()"
-              @click="runImport('TEXT')"
+              :severity="categoryFilter === 'SUCRE' ? 'primary' : 'secondary'"
+              label="Sucré"
+              size="small"
+              @click="categoryFilter = categoryFilter === 'SUCRE' ? 'ALL' : 'SUCRE'"
             />
-          </div>
-
-          <div class="stack">
-            <label for="import-file">Capture d'écran</label>
-            <input id="import-file" type="file" accept="image/*" @change="onImportFileChanged" />
             <Button
-              label="Importer capture"
-              icon="pi pi-image"
-              :disabled="importBusy || !importFile"
-              @click="runImport('SCREENSHOT')"
+              :severity="categoryFilter === 'SALE' ? 'primary' : 'secondary'"
+              label="Salé"
+              size="small"
+              @click="categoryFilter = categoryFilter === 'SALE' ? 'ALL' : 'SALE'"
             />
           </div>
-        </template>
-      </Card>
-
-      <Card class="panel">
-        <template #title>Recherche et filtres</template>
-        <template #content>
-          <div class="stack">
-            <label for="search">Recherche (titre + ingrédients)</label>
-            <input id="search" v-model="search" type="search" placeholder="ex: chocolat" />
-          </div>
-          <div class="row">
-            <label for="category-filter">Catégorie</label>
-            <select id="category-filter" v-model="categoryFilter">
-              <option value="ALL">Toutes</option>
-              <option value="SUCRE">Sucré</option>
-              <option value="SALE">Salé</option>
-            </select>
-            <label class="checkbox-line">
-              <input v-model="favoriteOnly" type="checkbox" />
-              Favoris uniquement
-            </label>
-          </div>
-        </template>
-      </Card>
+        </div>
+        <div class="toolbar-actions">
+          <Button
+            label="Nouvelle recette"
+            icon="pi pi-plus"
+            rounded
+            :loading="importBusy"
+            @click="openAddChoice"
+          />
+        </div>
+      </div>
 
       <section class="grid">
         <Card
@@ -611,10 +648,57 @@ onMounted(async () => {
         <Card v-if="recipes.length === 0" class="recipe-card empty-card">
           <template #title>Aucune recette</template>
           <template #content>
-            <p>Ajoute une recette via import assisté ou création manuelle.</p>
+            <p>Cliquez sur « Nouvelle recette » pour saisir à la main ou importer (coller / fichier).</p>
           </template>
         </Card>
       </section>
+    </section>
+
+    <section v-else-if="viewMode === 'ADD_CHOICE'" class="panel add-choice-panel">
+      <div class="row between">
+        <h2>Nouvelle recette</h2>
+        <Button label="Annuler" text icon="pi pi-times" @click="closeAddChoice" />
+      </div>
+
+      <div class="stack">
+        <label for="paste-field">Collez une URL, du texte ou une image</label>
+        <textarea
+          id="paste-field"
+          v-model="pasteFieldContent"
+          class="paste-field"
+          rows="4"
+          placeholder="Collez ici une URL, du texte de recette ou une image..."
+          @paste="onPasteInField"
+        />
+        <Button
+          label="Importer"
+          icon="pi pi-download"
+          :disabled="importBusy || !pasteFieldContent.trim()"
+          @click="runImportFromPasteField"
+        />
+      </div>
+
+      <div class="add-choice-buttons">
+        <Button
+          label="Saisir à la main"
+          icon="pi pi-pencil"
+          @click="openCreateForm"
+        />
+        <Button
+          label="Choisir un fichier"
+          icon="pi pi-folder-open"
+          :disabled="importBusy"
+          @click="triggerFilePick"
+        />
+      </div>
+
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/*,.txt,text/plain,text/html"
+        class="hidden-file-input"
+        @change="onFilePicked"
+      />
     </section>
 
     <section v-else-if="viewMode === 'DETAIL' && selectedRecipe" class="panel detail">
@@ -622,6 +706,13 @@ onMounted(async () => {
         <h2>{{ selectedRecipe.title }}</h2>
         <div class="row">
           <Button label="Retour" text icon="pi pi-arrow-left" @click="backToList" />
+          <Button
+            :icon="cookingState === 'OFF' ? 'pi pi-moon' : 'pi pi-sun'"
+            :label="cookingState === 'OFF' ? 'Mode cuisine' : 'Mode cuisine'"
+            text
+            :title="cookingState === 'OFF' ? 'Activer mode cuisine' : 'Désactiver mode cuisine'"
+            @click="toggleCookingMode"
+          />
           <Button label="Éditer" text icon="pi pi-pencil" @click="openEditForm(selectedRecipe)" />
           <Button
             :label="selectedRecipe.favorite ? 'Retirer favori' : 'Favori'"

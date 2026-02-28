@@ -81,7 +81,12 @@ class DexieRecipeService implements RecipeService {
         filters?.favorite !== undefined ? recipe.favorite === filters.favorite : true
       )
       .filter((recipe) => bySearch(recipe, filters?.search))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .sort((a, b) => {
+        if (a.favorite !== b.favorite) {
+          return a.favorite ? -1 : 1;
+        }
+        return b.updatedAt.localeCompare(a.updatedAt);
+      });
   }
 
   async scaleRecipe(recipeId: string, servings: number): Promise<Recipe> {

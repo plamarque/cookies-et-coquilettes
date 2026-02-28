@@ -2,7 +2,7 @@
 
 ## Phase actuelle
 
-Exécution des slices v1 en petites livraisons verticales.
+Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée : layout simplifié (cartes en premier), import unifié (Coller + Choisir fichier), favoris en tête.
 
 ## Slices v1
 

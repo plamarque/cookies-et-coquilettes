@@ -13,9 +13,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 1. Création manuelle d’une recette (titre, ingrédients, étapes, portions, temps optionnels, photo optionnelle).
 2. Import assisté d’une recette depuis :
    - partage système mobile,
-   - URL,
-   - capture d’écran,
-   - texte collé.
+   - écran « Nouvelle recette » : champ de collage (URL/texte/image) + Importer, Saisir à la main, Choisir un fichier.
 3. Structuration lisible de la recette importée sans altérer arbitrairement le sens de la source.
 4. Classement binaire des recettes : `Sucré` / `Salé` (sans tags en v1).
 5. Mise en favoris.
@@ -40,7 +38,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 ### Saisie et import
 
 1. L’utilisateur peut saisir une recette entièrement à la main.
-2. L’utilisateur peut importer une recette via partage/URL/screenshot/texte.
+2. L’utilisateur peut importer une recette via partage, depuis l'écran « Nouvelle recette » : collage (URL/texte/image) + Importer, ou choix fichier, ou saisie manuelle.
 3. Toute recette importée passe par un écran de revue/édition avant création définitive.
 4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement.
 
@@ -49,7 +47,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 1. Les recettes sont affichées sous forme de grille de vignettes.
 2. L’utilisateur peut filtrer par catégorie (`Sucré`, `Salé`) et par favoris.
 3. L’utilisateur peut rechercher en texte libre sur `titre + ingrédients`.
-4. La liste est triée par défaut par dernière modification (`updatedAt DESC`).
+4. La liste est triée par défaut : favoris en premier, puis par dernière modification (`updatedAt DESC`).
 5. La navigation privilégie l’accès rapide aux recettes fréquemment utilisées.
 
 ### Consultation et exécution
@@ -57,7 +55,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 1. L’écran détail affiche ingrédients, quantités, portions et étapes ordonnées.
 2. L’utilisateur peut modifier les portions ; les quantités sont recalculées immédiatement.
 3. L’utilisateur peut réinitialiser les portions à la valeur de base.
-4. Le mode cuisine tente d’empêcher la mise en veille de l’écran.
+4. Le mode cuisine (anti-veille) est activable uniquement depuis l'écran détail d'une recette ouverte.
 
 ### Édition
 

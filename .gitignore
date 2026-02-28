@@ -6,3 +6,6 @@ dist
 .env.*
 !.env.example
 *.tsbuildinfo
+e2e/tmp
+playwright-report/
+test-results/
