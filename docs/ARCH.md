@@ -60,6 +60,8 @@ Règles de contrat :
 
 Règles de contrat :
 - flux direct : `parse -> create -> détail` ; image en arrière-plan si absente,
+- l’UI expose un état de progression pendant l’import (analyse URL/texte, lecture image),
+- la `source` d’import est persistée avec `type + capturedAt` même quand `url` est absente,
 - en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
 
 ### Cooking mode service
