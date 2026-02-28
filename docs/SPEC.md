@@ -58,6 +58,8 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 4. L'utilisateur peut réinitialiser les portions à la valeur de base.
 5. Le mode cuisine (anti-veille) est activable uniquement depuis l'écran détail d'une recette ouverte.
 
+> **Note** : L'ajustement des portions (points 3-4) est prévu mais l'UI est temporairement masquée ; implémentation à finaliser (slice K).
+
 ### Image de recette
 
 1. L'image est affichée sur les cartes, dans l'en-tête du détail et dans le formulaire d'édition.

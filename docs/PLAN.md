@@ -18,6 +18,7 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | H | Import URL — pages web (fetch, JSON-LD, OpenAI, spinner, image) | Fait |
 | I | Import URL — Instagram (scraper open-source) | Différée |
 | J | Images recettes : génération IA automatique (fallback si pas d'extraction), placeholder | En cours |
+| K | Ajustement portions : recalcul quantités (UI masquée, implémentation à finaliser) | Différée |
 
 ## Definition of Done par slice
 

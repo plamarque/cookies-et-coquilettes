@@ -10,4 +10,4 @@ Aucun bug identifié pour l’instant (projet vide).
 
 ## Différé
 
-- Aucun travail différé pour l’instant.
+- Ajustement des portions : UI masquée car inopérante ; slice K, voir `docs/features/PORTIONS.md`.

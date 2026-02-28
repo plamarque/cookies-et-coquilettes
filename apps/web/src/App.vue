@@ -73,6 +73,8 @@ const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
 
+const FEATURE_PORTIONS_ENABLED = false;
+
 const form = ref<RecipeFormState>(emptyForm());
 
 function randomId(): string {
@@ -979,7 +981,8 @@ onMounted(async () => {
         Voir la recette originale
       </a>
 
-      <div v-if="selectedRecipe.servingsBase" class="servings-tools">
+      <!-- Portions UI masquée (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED && selectedRecipe.servingsBase" -->
+      <div v-if="false" class="servings-tools">
         <label for="servings-input">Portions</label>
         <input id="servings-input" v-model="servingsInput" type="number" min="1" step="1" />
         <Button label="Appliquer" @click="scaleToInput(selectedRecipe)" />
@@ -1122,7 +1125,8 @@ onMounted(async () => {
       </div>
 
       <div class="row">
-        <div class="stack">
+        <!-- Portions de base masqué (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED" -->
+        <div v-if="false" class="stack">
           <label for="servingsBase">Portions de base</label>
           <input id="servingsBase" v-model="form.servingsBase" type="number" min="1" step="1" />
         </div>
@@ -1156,7 +1160,8 @@ onMounted(async () => {
           placeholder="Unité"
           :aria-label="`ingredient-unit-${ingredient.id}`"
         />
-        <label class="checkbox-line">
+        <!-- Scalable masqué (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED" -->
+        <label v-if="false" class="checkbox-line">
           <input v-model="ingredient.isScalable" type="checkbox" />
           Scalable
         </label>
