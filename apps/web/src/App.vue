@@ -59,7 +59,7 @@ const errorMessage = ref<string>("");
 
 const search = ref("");
 const categoryFilter = ref<"ALL" | RecipeCategory>("ALL");
-const favoriteOnly = ref(true);
+const favoriteOnly = ref(false);
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const formImageInputRef = ref<HTMLInputElement | null>(null);
@@ -593,6 +593,8 @@ async function saveForm(): Promise<void> {
           ? "Recette importée et enregistrée."
           : "Recette créée.";
       selectedRecipeId.value = recipe.id;
+      // Désactiver le filtre favoris pour que la nouvelle recette apparaisse
+      favoriteOnly.value = false;
     }
     await refresh();
     viewMode.value = "DETAIL";
