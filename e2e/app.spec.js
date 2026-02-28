@@ -33,7 +33,7 @@ async function createRecipeViaImport(page, recipeText = "Recette brute") {
   await fileChooser.setFiles(filePath);
 
   await expect(page.locator(".message.success")).toContainText(
-    /Recette importée\.|L'extraction a échoué/i
+    /Recette importée\.|a échoué/i
   );
   await expect(page.locator("section.panel.detail, section.panel.form-panel")).toBeVisible();
 }

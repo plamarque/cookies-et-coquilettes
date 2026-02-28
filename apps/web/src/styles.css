@@ -548,6 +548,15 @@ select {
   text-decoration: underline;
 }
 
+.source-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  color: #3e4b46;
+  font-size: 0.9rem;
+}
+
 .source-input-row {
   display: flex;
   align-items: center;
