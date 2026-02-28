@@ -21,3 +21,29 @@ Ne pas contredire ces documents. Le code et les changements doivent s’y aligne
 1. Lire SPEC, DOMAIN et ARCH avant de modifier le comportement ou la structure.
 2. Utiliser PLAN pour « quoi faire ensuite » et ISSUES pour « ce qui est cassé ou différé ».
 3. Lors de la mise à jour des docs : modifier les docs normatifs quand le comportement ou la structure change ; garder les docs de suivi factuels.
+
+## Cursor Cloud specific instructions
+
+### Overview
+
+Cookies & Coquillettes is an npm-workspaces monorepo (Node 20) with three packages:
+- `apps/web` — Vue 3 PWA frontend (Vite, port 5173)
+- `apps/bff` — Express BFF for recipe parsing/AI (tsx watch, port 8787)
+- `packages/domain` — Shared domain types and rules
+
+No external database or Docker is required. All user data is stored client-side in IndexedDB.
+
+### Running services
+
+Standard commands are documented in `docs/DEVELOPMENT.md`. Key notes:
+- Copy `.env.example` to `.env` before first run. Set `VITE_BFF_URL=http://localhost:8787` and `CORS_ORIGIN=http://localhost:5173` for local dev.
+- `OPENAI_API_KEY` is optional; without it the BFF falls back to JSON-LD extraction only.
+- `npm run dev` starts both web + BFF concurrently via `scripts/start-dev.sh`. To run them separately: `npm run dev:web` / `npm run dev:bff`.
+- The BFF uses `tsx watch` for hot-reload; dependency changes require restarting the process.
+
+### Testing
+
+- **Unit tests**: `npm run test:unit` (Node built-in test runner on `packages/domain`).
+- **Type checking**: `npm run typecheck` (vue-tsc for web, tsc for BFF).
+- **E2E tests**: `npm run test:e2e` (builds the web app, starts a preview server on port 4174, runs Playwright). Requires `npx playwright install chromium` first.
+- Some E2E tests have pre-existing strict-mode failures (duplicate "Enregistrer" button selectors); 1 of 5 tests passes as of the initial codebase state.
