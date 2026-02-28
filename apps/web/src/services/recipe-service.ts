@@ -10,9 +10,18 @@ import {
 } from "@cookies-et-coquilettes/domain";
 import { db } from "../storage/db";
 
+const BFF_URL = import.meta.env.VITE_BFF_URL || "http://localhost:8787";
+
 export async function storeImageFromUrl(url: string): Promise<string | undefined> {
   try {
-    const res = await fetch(url, { mode: "cors", signal: AbortSignal.timeout(10000) });
+    const isExternal = url.startsWith("http://") || url.startsWith("https://");
+    const fetchUrl = isExternal
+      ? `${BFF_URL}/api/proxy-image`
+      : url;
+    const fetchOpts: RequestInit = isExternal
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(15000) }
+      : { mode: "cors", signal: AbortSignal.timeout(10000) };
+    const res = await fetch(fetchUrl, fetchOpts);
     if (!res.ok) return undefined;
     const blob = await res.blob();
     if (!blob.type.startsWith("image/")) return undefined;

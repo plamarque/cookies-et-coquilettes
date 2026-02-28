@@ -76,6 +76,30 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
   res.json(parsed);
 });
 
+app.post("/api/proxy-image", async (req, res) => {
+  const url = req.body?.url as string | undefined;
+  if (!url || !url.startsWith("http")) {
+    res.status(400).json({ error: "url is required and must be http(s)" });
+    return;
+  }
+  try {
+    const imgRes = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!imgRes.ok) {
+      res.status(502).json({ error: `Upstream fetch failed: ${imgRes.status}` });
+      return;
+    }
+    const blob = await imgRes.blob();
+    if (!blob.type.startsWith("image/")) {
+      res.status(400).json({ error: "Response is not an image" });
+      return;
+    }
+    res.setHeader("Content-Type", blob.type);
+    res.send(Buffer.from(await blob.arrayBuffer()));
+  } catch (err) {
+    res.status(502).json({ error: (err as Error)?.message ?? "Proxy fetch failed" });
+  }
+});
+
 app.post("/api/generate-recipe-image", async (req, res) => {
   const title = req.body?.title as string | undefined;
   const ingredients = req.body?.ingredients as Array<{ label?: string }> | undefined;
