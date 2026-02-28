@@ -30,5 +30,6 @@ export interface ParsedRecipeDraft {
   steps: InstructionStep[];
   prepTimeMin?: number;
   cookTimeMin?: number;
+  imageUrl?: string;
   source?: ImportSource;
 }

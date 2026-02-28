@@ -10,6 +10,27 @@ import {
 } from "@cookies-et-coquilettes/domain";
 import { db } from "../storage/db";
 
+export async function storeImageFromUrl(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url, { mode: "cors", signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return undefined;
+    const blob = await res.blob();
+    if (!blob.type.startsWith("image/")) return undefined;
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await db.images.add({
+      id,
+      mimeType: blob.type,
+      sizeBytes: blob.size,
+      createdAt: now,
+      blob
+    });
+    return id;
+  } catch {
+    return undefined;
+  }
+}
+
 function bySearch(recipe: Recipe, search?: string): boolean {
   if (!search) {
     return true;

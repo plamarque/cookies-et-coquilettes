@@ -1,7 +1,13 @@
+import * as path from "path";
+import { fileURLToPath } from "url";
+import { config } from "dotenv";
 import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { parseRecipeWithCloud } from "./parsing-client.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
 
 const app = express();
 const upload = multer();

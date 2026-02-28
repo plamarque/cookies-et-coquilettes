@@ -15,6 +15,8 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | E | Import complet + revue obligatoire + fallback draft manuel | En cours |
 | F | Mode cuisine Wake Lock + fallback non bloquant | En cours |
 | G | Durcissement release v1 (tests smoke E2E + cohérence erreurs/docs) | En cours |
+| H | Import URL — pages web (fetch, JSON-LD, OpenAI, spinner, image) | Fait |
+| I | Import URL — Instagram (scraper open-source) | Différée |
 
 ## Definition of Done par slice
 

@@ -92,6 +92,18 @@ Index minimaux :
 4. Le front impose une revue utilisateur avant création de recette.
 5. En cas d’échec partiel ou BFF indisponible, le front et/ou le BFF renvoient un draft fallback minimal.
 
+### Stratégie de parsing (import URL pages web)
+
+Ordre de priorité côté BFF :
+
+1. **JSON-LD Schema.org** — si la page contient un bloc `application/ld+json` de type `Recipe`, extraction directe (titre, ingrédients, étapes, image, portions, temps).
+2. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
+3. **Fallback** — draft minimal éditable.
+
+L’image est extraite via le champ `image` du JSON-LD ou via la balise `og:image`. Le front télécharge l’image à la sauvegarde et la stocke dans IndexedDB.
+
+Le BFF charge `.env` à la racine du projet (dotenv) pour `OPENAI_API_KEY`. L’extraction des ingrédients JSON-LD reconnaît notamment : `litre`/`litres`, `c à s`/`c. à s` (cuillère à soupe), et les unités courantes (g, ml, pincée, tranche, etc.).
+
 ## Gestion d'erreurs v1
 
 1. Messages utilisateur explicites côté UI.

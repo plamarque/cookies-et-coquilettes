@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
 import type {
   ImportSource,
@@ -11,7 +12,7 @@ import type {
   RecipeFilters
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
-import { dexieRecipeService } from "./services/recipe-service";
+import { dexieRecipeService, storeImageFromUrl } from "./services/recipe-service";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService } from "./services/import-service";
 
@@ -41,6 +42,7 @@ interface RecipeFormState {
   ingredients: IngredientInput[];
   steps: StepInput[];
   source?: ImportSource;
+  imageUrl?: string;
 }
 
 const recipes = ref<Recipe[]>([]);
@@ -59,6 +61,7 @@ const favoriteOnly = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
+const importSourceType = ref<"url" | "text" | "file" | null>(null);
 
 const servingsInput = ref("");
 
@@ -141,6 +144,7 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
     servingsBase: draft.servingsBase ? String(draft.servingsBase) : "",
     prepTimeMin: draft.prepTimeMin ? String(draft.prepTimeMin) : "",
     cookTimeMin: draft.cookTimeMin ? String(draft.cookTimeMin) : "",
+    imageUrl: draft.imageUrl,
     ingredients:
       draft.ingredients.length > 0
         ? draft.ingredients.map((ingredient) => ({
@@ -296,9 +300,10 @@ async function runImportFromPasteField(): Promise<void> {
 
   clearMessages();
   importBusy.value = true;
+  importSourceType.value = isLikelyUrl(content) ? "url" : "text";
   try {
     let draft: ParsedRecipeDraft;
-    if (isLikelyUrl(content)) {
+    if (importSourceType.value === "url") {
       draft = await bffImportService.importFromUrl(content);
     } else {
       draft = await bffImportService.importFromText(content);
@@ -309,6 +314,7 @@ async function runImportFromPasteField(): Promise<void> {
     setError(error);
   } finally {
     importBusy.value = false;
+    importSourceType.value = null;
   }
 }
 
@@ -329,6 +335,7 @@ function onPasteInField(ev: ClipboardEvent): void {
 async function runImportFromFile(file: File): Promise<void> {
   clearMessages();
   importBusy.value = true;
+  importSourceType.value = "file";
   try {
     let draft: ParsedRecipeDraft;
     if (file.type.startsWith("image/")) {
@@ -342,6 +349,7 @@ async function runImportFromFile(file: File): Promise<void> {
     setError(error);
   } finally {
     importBusy.value = false;
+    importSourceType.value = null;
   }
 }
 
@@ -454,7 +462,14 @@ async function saveForm(): Promise<void> {
       formMode.value === "EDIT" && formRecipeId.value
         ? recipes.value.find((recipe) => recipe.id === formRecipeId.value)
         : undefined;
-    const recipe = formToRecipe(existing);
+    let recipe = formToRecipe(existing);
+
+    if (!existing && form.value.imageUrl) {
+      const imageId = await storeImageFromUrl(form.value.imageUrl);
+      if (imageId) {
+        recipe = { ...recipe, imageId };
+      }
+    }
 
     if (existing) {
       await dexieRecipeService.updateRecipe(existing.id, recipe);
@@ -658,6 +673,15 @@ onMounted(async () => {
       <div class="row between">
         <h2>Nouvelle recette</h2>
         <Button label="Annuler" text icon="pi pi-times" @click="closeAddChoice" />
+      </div>
+
+      <div
+        v-if="importBusy && importSourceType === 'url'"
+        class="import-analyzing"
+        aria-live="polite"
+      >
+        <ProgressSpinner style="width: 2.5rem; height: 2.5rem" strokeWidth="4" />
+        <p>Analyse de la recette en cours…</p>
       </div>
 
       <div class="stack">
