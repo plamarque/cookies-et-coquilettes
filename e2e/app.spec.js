@@ -8,7 +8,7 @@ async function createRecipeViaManual(page, name = "Cookies test") {
   await page.getByRole("button", { name: "Saisir à la main" }).click();
   await page.getByLabel("Titre").fill(name);
   await page.getByLabel(/step-text-/).first().fill("Mélanger les ingrédients");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
 
@@ -41,8 +41,8 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.goto("/");
     await createRecipeViaManual(page, "Recette test mode cuisine");
     await expect(page.getByRole("heading", { name: "Recette test mode cuisine" })).toBeVisible();
-    await page.getByRole("button", { name: "Mode cuisine" }).click();
-    await expect(page.getByText(/WAKE_LOCK|FALLBACK/)).toBeVisible();
+    await page.getByRole("button", { name: "Cuisiner" }).click();
+    await expect(page.getByText(/Mode cuisine actif/)).toBeVisible();
   });
 
   test("création, recherche, édition portions et suppression", async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.getByRole("button", { name: "Ajouter une image" }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(imagePath);
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    await page.getByRole("button", { name: "Enregistrer" }).first().click();
 
     await expect(page.getByRole("heading", { name: "Recette avec image" })).toBeVisible();
     await expect(page.getByAltText("Photo de la recette").first()).toBeVisible();
@@ -100,7 +100,7 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.getByRole("button", { name: "Éditer" }).click();
     await expect(page.locator(".recipe-form-image")).toBeVisible();
     await page.getByRole("button", { name: "Supprimer" }).first().click();
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    await page.getByRole("button", { name: "Enregistrer" }).first().click();
 
     await page.getByRole("button", { name: "Retour" }).click();
     await expect(page.locator(".recipe-card-image")).not.toBeVisible();
