@@ -7,6 +7,21 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_BFF_URL || "http://localhost:8787";
 
+export async function extractImageFromUrl(url: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/import/extract-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    if (!response.ok) return undefined;
+    const data = (await response.json()) as { imageUrl?: string };
+    return data.imageUrl;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function generateRecipeImage(draft: {
   title: string;
   ingredients: Array<{ label?: string }>;

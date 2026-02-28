@@ -4,7 +4,7 @@ import { config } from "dotenv";
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import { parseRecipeWithCloud } from "./parsing-client.js";
+import { extractImageFromUrl, parseRecipeWithCloud } from "./parsing-client.js";
 import { generateRecipeImage } from "./image-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -74,6 +74,20 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
     screenshotBase64
   });
   res.json(parsed);
+});
+
+app.post("/api/import/extract-image", async (req, res) => {
+  const url = req.body?.url as string | undefined;
+  if (!url || !url.startsWith("http")) {
+    res.status(400).json({ error: "url is required and must be http(s)" });
+    return;
+  }
+  const imageUrl = await extractImageFromUrl(url);
+  if (!imageUrl) {
+    res.status(404).json({ error: "No image found on page" });
+    return;
+  }
+  res.json({ imageUrl });
 });
 
 app.post("/api/proxy-image", async (req, res) => {

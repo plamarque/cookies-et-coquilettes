@@ -68,6 +68,7 @@ const pasteFieldContent = ref("");
 const importBusy = ref(false);
 const importSourceType = ref<"url" | "text" | "file" | null>(null);
 const imageGenerating = ref(false);
+const imageReextracting = ref(false);
 
 const servingsInput = ref("");
 
@@ -177,18 +178,15 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
 function formToRecipe(existing?: Recipe): Recipe {
   const now = new Date().toISOString();
   const servingsBase = parseNumber(form.value.servingsBase);
-  const source = form.value.source
+  const sourceUrl = form.value.source?.url?.trim();
+  const source = sourceUrl
     ? {
-        type: form.value.source.type,
-        url: form.value.source.url,
-        capturedAt: form.value.source.capturedAt
+        type: form.value.source!.type,
+        url: sourceUrl,
+        capturedAt: form.value.source!.capturedAt
       }
-    : existing?.source
-      ? {
-          type: existing.source.type,
-          url: existing.source.url,
-          capturedAt: existing.source.capturedAt
-        }
+    : existing?.source?.url
+      ? existing.source
       : undefined;
   const ingredients = form.value.ingredients
     .map((ingredient) => {
@@ -273,6 +271,22 @@ const canSaveForm = computed(() => {
       : undefined
   );
   return isRecipeValidForSave(candidate);
+});
+
+const formSourceUrl = computed({
+  get: () => form.value.source?.url ?? "",
+  set: (v: string) => {
+    const url = v?.trim() || undefined;
+    if (url) {
+      form.value.source = {
+        type: form.value.source?.type ?? "URL",
+        url,
+        capturedAt: form.value.source?.capturedAt ?? new Date().toISOString()
+      };
+    } else if (form.value.source) {
+      form.value.source = { ...form.value.source, url: undefined };
+    }
+  }
 });
 
 function openAddChoice(): void {
@@ -525,6 +539,22 @@ function triggerImageGeneration(): void {
     .finally(() => {
       imageGenerating.value = false;
     });
+}
+
+async function triggerFullReextract(): Promise<void> {
+  const url = form.value.source?.url?.trim();
+  if (!url) return;
+  imageReextracting.value = true;
+  clearMessages();
+  try {
+    const draft = await bffImportService.importFromUrl(url);
+    form.value = draftToForm(draft);
+    feedback.value = "Recette réextraite depuis l'URL.";
+  } catch (err) {
+    setError(err);
+  } finally {
+    imageReextracting.value = false;
+  }
 }
 
 function removeStep(id: string): void {
@@ -853,6 +883,16 @@ onMounted(async () => {
         {{ selectedRecipe.category }} · base:
         {{ selectedRecipe.servingsBase ? `${selectedRecipe.servingsBase} portions` : "non définie" }}
       </p>
+      <a
+        v-if="selectedRecipe.source?.url"
+        :href="selectedRecipe.source.url"
+        target="_blank"
+        rel="noopener"
+        class="source-link"
+      >
+        <i class="pi pi-external-link" />
+        Voir la recette originale
+      </a>
 
       <div v-if="selectedRecipe.servingsBase" class="servings-tools">
         <label for="servings-input">Portions</label>
@@ -897,6 +937,28 @@ onMounted(async () => {
       </div>
 
       <div class="stack">
+        <label for="source-url">URL de la recette originale</label>
+        <div class="row" style="gap: 0.5rem; align-items: center; flex-wrap: wrap">
+          <input
+            id="source-url"
+            v-model="formSourceUrl"
+            type="url"
+            placeholder="https://..."
+            style="flex: 1; min-width: 200px"
+          />
+          <Button
+            v-if="form.source?.url"
+            text
+            size="small"
+            icon="pi pi-refresh"
+            label="Réextraire la recette"
+            :loading="imageReextracting"
+            @click="triggerFullReextract"
+          />
+        </div>
+      </div>
+
+      <div class="stack">
         <label>Image</label>
         <div v-if="form.imageUrl || (form.imageId && typeof form.imageId === 'string')" class="row" style="align-items: flex-start">
           <RecipeImage
@@ -936,9 +998,9 @@ onMounted(async () => {
             />
           </div>
         </div>
-        <div v-else-if="imageGenerating" class="recipe-form-image-placeholder">
+        <div v-else-if="imageGenerating || imageReextracting" class="recipe-form-image-placeholder">
           <ProgressSpinner style="width: 2rem; height: 2rem" strokeWidth="4" />
-          <span>Génération de l'image en cours…</span>
+          <span>{{ imageReextracting ? "Extraction de la recette en cours…" : "Génération de l'image en cours…" }}</span>
         </div>
         <div v-else class="row" style="gap: 0.5rem; flex-wrap: wrap">
           <Button

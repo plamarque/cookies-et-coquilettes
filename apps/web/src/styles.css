@@ -249,6 +249,20 @@ select {
   color: #3e4b46;
 }
 
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--p-primary-color, #1f4f46);
+  font-size: 0.9rem;
+  text-decoration: none;
+  margin-top: 0.25rem;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 900px) {
   .ingredient-row {
     grid-template-columns: 1fr 1fr;

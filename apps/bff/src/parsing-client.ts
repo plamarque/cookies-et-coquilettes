@@ -48,27 +48,95 @@ function parseServings(value: unknown): number | undefined {
   return undefined;
 }
 
+const UNIT_PATTERN =
+  /(?:litres?|g(?:r?)?|kg|ml|cl|L|cuillère[s]?\s+à\s+soupe|cuillère[s]?\s+à\s+café|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cc|cs|CC|pincée|œuf|oeuf|oeufs|œufs|unité|unités|pièce|pièces|tranche|tranches|feuille|feuilles)/i;
+
+const QTY_PATTERN = /(\d*\/\d+|\d+(?:[.,]\d+)?|demi|½|⅓|⅔|¼|¾)/;
+
+function parseQuantity(value: string): number | undefined {
+  const v = value.trim().toLowerCase();
+  const wordFractions: Record<string, number> = {
+    demi: 0.5,
+    "½": 0.5,
+    "⅓": 1 / 3,
+    "⅔": 2 / 3,
+    "¼": 0.25,
+    "¾": 0.75
+  };
+  if (v in wordFractions) return wordFractions[v];
+  const fracMatch = v.match(/^(\d*)\/(\d+)$/);
+  if (fracMatch) {
+    const num = fracMatch[1] ? parseInt(fracMatch[1], 10) : 1;
+    const den = parseInt(fracMatch[2], 10);
+    return den ? num / den : undefined;
+  }
+  const n = parseFloat(v.replace(",", "."));
+  return Number.isNaN(n) ? undefined : n;
+}
+
+function normalizeUnit(raw: string): string {
+  const u = raw.replace(/\.+$/, "").trim().toLowerCase();
+  if (/^gr?$/.test(u)) return "g";
+  if (
+    /^cc$/i.test(u) ||
+    /^c\.?\s*à\s*c\.?$/.test(u) ||
+    u === "cuillère à café" ||
+    u === "cuillères à café"
+  )
+    return "c. à c.";
+  if (/^c\.?\s*à\s*s\.?$/.test(u) || u === "cuillère à soupe" || u === "cuillères à soupe")
+    return "c. à s.";
+  return raw.replace(/\.+$/, "").trim();
+}
+
 function parseIngredientFromRaw(raw: string, id: string): IngredientLine {
   const trimmed = raw.trim();
-  const qtyMatch = trimmed.match(
-    /^(\d+(?:[.,]\d+)?)\s*(litres?|g|kg|ml|cl|L|cuillère à soupe|cuillères à soupe|c\.?\s*à\s*[sc]\.?|cuillère|cc|cs|pincée|œuf|oeuf|oeufs|œufs|unité|unités|pièce|pièces|tranche|tranches|feuille|feuilles)?\s*(?:de\s+)?(.+)$/i
+
+  // Format "label : quantity unit" (ex: "philadelphia ou ricotta : 35 gr", "huile : 1/2 CC")
+  const labelFirstMatch = trimmed.match(
+    new RegExp(`^(.+?)\\s*:\\s*${QTY_PATTERN.source}\\s*(${UNIT_PATTERN.source})\\s*$`, "i")
   );
-  if (qtyMatch) {
-    const qty = parseFloat(qtyMatch[1].replace(",", "."));
-    const rawUnit = qtyMatch[2]?.trim();
-    const unit = rawUnit ? rawUnit.replace(/\.+$/, "").trim() || undefined : undefined;
-    const label = qtyMatch[3]?.trim() || trimmed;
-    const isScalable =
-      unit !== undefined &&
-      !/pincée|sel|poivre|à volonté/i.test(unit + label);
-    return {
-      id,
-      label,
-      quantity: qty,
-      unit,
-      isScalable: Boolean(isScalable)
-    };
+  if (labelFirstMatch) {
+    const label = labelFirstMatch[1].trim();
+    const qty = parseQuantity(labelFirstMatch[2]);
+    const rawUnit = labelFirstMatch[3]?.trim();
+    if (qty !== undefined && rawUnit) {
+      const unit = normalizeUnit(rawUnit);
+      const isScalable =
+        !/pincée|sel|poivre|à volonté/i.test(unit + label);
+      return {
+        id,
+        label,
+        quantity: qty,
+        unit,
+        isScalable: Boolean(isScalable)
+      };
+    }
   }
+
+  // Format "quantity unit label" (ex: "35 g philadelphia", "1/2 cc huile")
+  const qtyFirstMatch = trimmed.match(
+    new RegExp(`^${QTY_PATTERN.source}\\s*(${UNIT_PATTERN.source})?\\s*(?:de\\s+)?(.+)$`, "i")
+  );
+  if (qtyFirstMatch) {
+    const qty = parseQuantity(qtyFirstMatch[1]);
+    const rawUnit = qtyFirstMatch[2]?.trim();
+    const label = qtyFirstMatch[3]?.trim() || trimmed;
+    if (qty !== undefined) {
+      const unit = rawUnit ? normalizeUnit(rawUnit) : undefined;
+      const isScalable =
+        unit !== undefined &&
+        !/pincée|sel|poivre|à volonté/i.test(unit + label);
+      return {
+        id,
+        label,
+        quantity: qty,
+        unit,
+        isScalable: Boolean(isScalable)
+      };
+    }
+  }
+
   return {
     id,
     label: trimmed,
@@ -249,7 +317,7 @@ Extrais les champs suivants au format JSON (réponds uniquement avec du JSON val
   "ingredients": [{"label": "nom", "quantity": nombre ou null, "unit": "unité", "isScalable": true/false}],
   "steps": [{"order": 1, "text": "description étape"}]
 }
-Pour les ingrédients : quantity et unit optionnels. isScalable=true si la quantité peut être ajustée (ex: farine), false pour "sel", "poivre", "à volonté".
+Pour les ingrédients : quantity et unit optionnels. Reconnaître : g/gr (grammes), CC/c à c (cuillère à café), c à s (cuillère à soupe), fractions (1/2 = demi). isScalable=true si la quantité peut être ajustée (ex: farine), false pour "sel", "poivre", "à volonté".
 Texte à analyser :
 
 ${text.slice(0, 12000)}`;
@@ -327,6 +395,23 @@ async function fetchUrl(url: string): Promise<string> {
   });
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
   return res.text();
+}
+
+/** Extrait uniquement l'URL de l'image depuis une page (og:image, JSON-LD, TwicPics). */
+export async function extractImageFromUrl(url: string): Promise<string | undefined> {
+  try {
+    const html = await fetchUrl(url);
+    const ogImage = extractOgImage(html, url);
+    if (ogImage) return ogImage;
+    const jsonLdDraft = extractRecipeFromJsonLd(html, url);
+    if (jsonLdDraft?.imageUrl) {
+      const twicImage = extractTwicPicsImage(html, jsonLdDraft.imageUrl);
+      return twicImage ?? jsonLdDraft.imageUrl;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function parseRecipeWithCloud(
