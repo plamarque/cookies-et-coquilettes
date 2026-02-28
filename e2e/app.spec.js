@@ -36,7 +36,8 @@ test.describe("Cookies & Coquillettes v1", () => {
   test("affiche l'écran principal avec les cartes", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Nouvelle recette" })).toBeVisible();
-    await expect(page.getByText("Aucune recette")).toBeVisible();
+    await expect(page.getByText("Coquillettes au jambon de Juan Arbelaez")).toBeVisible();
+    await expect(page.getByText("Cookies aux pépites de chocolat")).toBeVisible();
   });
 
   test("active le mode cuisine depuis l'écran détail", async ({ page }) => {

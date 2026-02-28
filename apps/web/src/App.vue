@@ -13,6 +13,7 @@ import type {
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
+import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
@@ -614,6 +615,7 @@ async function toggleCookingMode(): Promise<void> {
 }
 
 onMounted(async () => {
+  await seedIfEmpty();
   await refresh();
 });
 </script>
