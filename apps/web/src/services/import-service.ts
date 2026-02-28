@@ -6,6 +6,29 @@ import type {
 } from "@cookies-et-coquilettes/domain";
 
 const API_BASE_URL = import.meta.env.VITE_BFF_URL || "http://localhost:8787";
+
+export async function generateRecipeImage(draft: {
+  title: string;
+  ingredients: Array<{ label?: string }>;
+  steps: Array<{ text?: string }>;
+}): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/generate-recipe-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: draft.title,
+        ingredients: draft.ingredients,
+        steps: draft.steps
+      })
+    });
+    if (!response.ok) return undefined;
+    const data = (await response.json()) as { imageUrl?: string };
+    return data.imageUrl;
+  } catch {
+    return undefined;
+  }
+}
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
 async function parseResponse(response: Response): Promise<ParsedRecipeDraft> {

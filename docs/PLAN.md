@@ -17,6 +17,7 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | G | Durcissement release v1 (tests smoke E2E + cohérence erreurs/docs) | En cours |
 | H | Import URL — pages web (fetch, JSON-LD, OpenAI, spinner, image) | Fait |
 | I | Import URL — Instagram (scraper open-source) | Différée |
+| J | Images recettes : génération IA automatique (fallback si pas d'extraction), placeholder | En cours |
 
 ## Definition of Done par slice
 

@@ -5,6 +5,7 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { parseRecipeWithCloud } from "./parsing-client.js";
+import { generateRecipeImage } from "./image-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
@@ -73,6 +74,34 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
     screenshotBase64
   });
   res.json(parsed);
+});
+
+app.post("/api/generate-recipe-image", async (req, res) => {
+  const title = req.body?.title as string | undefined;
+  const ingredients = req.body?.ingredients as Array<{ label?: string }> | undefined;
+  const steps = req.body?.steps as Array<{ text?: string }> | undefined;
+
+  if (!title?.trim()) {
+    res.status(400).json({ error: "title is required" });
+    return;
+  }
+
+  const imageUrl = await generateRecipeImage({
+    title: title.trim(),
+    ingredients: Array.isArray(ingredients)
+      ? ingredients.map((i) => ({ label: String(i?.label ?? "").trim() }))
+      : [],
+    steps: Array.isArray(steps)
+      ? steps.map((s) => ({ text: String(s?.text ?? "").trim() }))
+      : []
+  });
+
+  if (!imageUrl) {
+    res.status(503).json({ error: "Image generation unavailable" });
+    return;
+  }
+
+  res.json({ imageUrl });
 });
 
 app.listen(port, () => {

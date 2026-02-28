@@ -17,7 +17,7 @@ import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
-import { bffImportService } from "./services/import-service";
+import { bffImportService, generateRecipeImage } from "./services/import-service";
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT" | "IMPORT_REVIEW";
@@ -67,6 +67,7 @@ const formImageInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
 const importSourceType = ref<"url" | "text" | "file" | null>(null);
+const imageGenerating = ref(false);
 
 const servingsInput = ref("");
 
@@ -421,6 +422,24 @@ function openImportReview(draft: ParsedRecipeDraft): void {
   formRecipeId.value = null;
   form.value = draftToForm(draft);
   viewMode.value = "FORM";
+  imageGenerating.value = false;
+
+  if (!draft.imageUrl && !form.value.imageId && draft.title?.trim()) {
+    imageGenerating.value = true;
+    generateRecipeImage({
+      title: draft.title,
+      ingredients: draft.ingredients,
+      steps: draft.steps
+    })
+      .then((imageUrl) => {
+        if (imageUrl && imageGenerating.value) {
+          form.value.imageUrl = imageUrl;
+        }
+      })
+      .finally(() => {
+        imageGenerating.value = false;
+      });
+  }
 }
 
 function openDetail(recipe: Recipe): void {
@@ -479,6 +498,35 @@ function removeFormImage(): void {
   form.value.imageUrl = undefined;
 }
 
+function triggerImageGeneration(): void {
+  if (!form.value.title?.trim()) return;
+  const recipeId = formRecipeId.value;
+  const isEdit = formMode.value === "EDIT" && recipeId;
+  imageGenerating.value = true;
+
+  generateRecipeImage({
+    title: form.value.title,
+    ingredients: form.value.ingredients.map((i) => ({ label: i.label })),
+    steps: form.value.steps.map((s) => ({ text: s.text }))
+  })
+    .then(async (imageUrl) => {
+      if (!imageUrl) return;
+      if (viewMode.value === "FORM" && formRecipeId.value === recipeId) {
+        form.value.imageUrl = imageUrl;
+        form.value.imageId = null;
+      } else if (isEdit) {
+        const imageId = await storeImageFromUrl(imageUrl);
+        if (imageId) {
+          await dexieRecipeService.updateRecipe(recipeId, { imageId });
+          await refresh();
+        }
+      }
+    })
+    .finally(() => {
+      imageGenerating.value = false;
+    });
+}
+
 function removeStep(id: string): void {
   form.value.steps = form.value.steps.filter((step) => step.id !== id);
   if (form.value.steps.length === 0) {
@@ -495,7 +543,7 @@ async function saveForm(): Promise<void> {
         : undefined;
     let recipe = formToRecipe(existing);
 
-    if (!recipe.imageId && !existing && form.value.imageUrl) {
+    if (!recipe.imageId && form.value.imageUrl) {
       const imageId = await storeImageFromUrl(form.value.imageUrl);
       if (imageId) {
         recipe = { ...recipe, imageId };
@@ -873,6 +921,14 @@ onMounted(async () => {
             <Button
               text
               size="small"
+              icon="pi pi-sparkles"
+              label="Générer"
+              :loading="imageGenerating"
+              @click="triggerImageGeneration"
+            />
+            <Button
+              text
+              size="small"
               severity="secondary"
               icon="pi pi-times"
               label="Supprimer"
@@ -880,14 +936,27 @@ onMounted(async () => {
             />
           </div>
         </div>
-        <Button
-          v-else
-          text
-          size="small"
-          icon="pi pi-image"
-          label="Ajouter une image"
-          @click="triggerFormImagePick"
-        />
+        <div v-else-if="imageGenerating" class="recipe-form-image-placeholder">
+          <ProgressSpinner style="width: 2rem; height: 2rem" strokeWidth="4" />
+          <span>Génération de l'image en cours…</span>
+        </div>
+        <div v-else class="row" style="gap: 0.5rem; flex-wrap: wrap">
+          <Button
+            text
+            size="small"
+            icon="pi pi-image"
+            label="Ajouter une image"
+            @click="triggerFormImagePick"
+          />
+          <Button
+            text
+            size="small"
+            icon="pi pi-sparkles"
+            label="Générer une image"
+            :loading="imageGenerating"
+            @click="triggerImageGeneration"
+          />
+        </div>
         <input
           ref="formImageInputRef"
           type="file"

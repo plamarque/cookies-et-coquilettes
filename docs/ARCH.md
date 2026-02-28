@@ -30,6 +30,8 @@ Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScr
 | `import-service` | Import URL/share/screenshot/texte + appel BFF | `apps/web/src/services/import-service.ts` |
 | `cooking-mode-service` | Wake Lock + fallback navigateur | `apps/web/src/services/cooking-mode-service.ts` |
 | `db` | Schéma IndexedDB et accès tables | `apps/web/src/storage/db.ts` |
+| `ingredient-image-service` | Résolution d'image ingrédient (cache local, génération IA), stockage | `apps/web/src/services/ingredient-image-service.ts` |
+| `IngredientImage` (composant Vue) | Affichage de l'icône ingrédient (fallback si absent) | `apps/web/src/components/IngredientImage.vue` |
 | `import-api` | Endpoints BFF pour OCR/parsing | `apps/bff/src` |
 | `domain-types` | Types métier partagés | `packages/domain/src` |
 
@@ -72,11 +74,13 @@ Règles de contrat :
 Tables minimales :
 - `recipes`
 - `images`
+- `ingredientImages` (images d'ingrédients, clé = id normalisé du label)
 
 Index minimaux :
 - `category`
 - `favorite`
 - `updatedAt`
+- `ingredientImages.createdAt`
 
 ### Règles de persistance
 
@@ -100,11 +104,39 @@ Ordre de priorité côté BFF :
 2. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
 3. **Fallback** — draft minimal éditable.
 
-L’image est extraite via le champ `image` du JSON-LD ou via la balise `og:image`. Le front télécharge l’image à la sauvegarde et la stocke dans IndexedDB.
+L'image est extraite via le champ `image` du JSON-LD ou via la balise `og:image`. Le front télécharge l'image à la sauvegarde et la stocke dans IndexedDB.
+
+**Génération automatique** : lorsqu'aucune image n'est extraite, le BFF peut générer une image via une API IA (ex. DALL-E) à partir du titre, des ingrédients et des étapes. Style : photo de plat type Instagram, flat lay, élégant. Le front affiche un placeholder pendant la génération ; une fois l'URL reçue, l'image est téléchargée et stockée localement.
+
+**Images des ingrédients** : le service `ingredient-image-service` résout l'image d'un ingrédient par son label normalisé. Si l'image n'existe pas en cache local, le BFF génère une image IA (prompt : ingrédient isolé, style atelier de cuisine, photoréaliste, lisible en petit format). L'image est stockée dans `ingredientImages` et mutualisée entre recettes. Format cible : petit (ex. 64×64 ou 96×96 px).
+
+Flux de résolution :
+
+```mermaid
+flowchart LR
+    subgraph UI [UI]
+        List[Liste ingrédients]
+        Card[Cartes accueil]
+    end
+    subgraph Service [ingredient-image-service]
+        Resolve[Résoudre image]
+        Cache[Cache local]
+        Gen[Générer IA]
+    end
+    subgraph BFF [BFF / Cloud]
+        API[API Image IA]
+    end
+    List --> Resolve
+    Card --> Resolve
+    Resolve --> Cache
+    Cache -->|absent| Gen
+    Gen --> API
+    Gen --> Cache
+```
 
 Le BFF charge `.env` à la racine du projet (dotenv) pour `OPENAI_API_KEY`. L’extraction des ingrédients JSON-LD reconnaît notamment : `litre`/`litres`, `c à s`/`c. à s` (cuillère à soupe), et les unités courantes (g, ml, pincée, tranche, etc.).
 
-## Gestion d'erreurs v1
+## Gestion d’erreurs v1
 
 1. Messages utilisateur explicites côté UI.
 2. Logs console front et BFF pour diagnostic local.
