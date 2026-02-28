@@ -10,6 +10,7 @@
     "dev": "./scripts/start-dev.sh",
     "dev:web": "npm run dev -w @cookies-et-coquilettes/web",
     "dev:bff": "npm run dev -w @cookies-et-coquilettes/bff",
+    "start:bff:render": "npm run build:bff && npm run start -w @cookies-et-coquilettes/bff",
     "preview:e2e": "node scripts/start-preview-e2e.js",
     "build:web": "npm run build -w @cookies-et-coquilettes/web",
     "build:bff": "npm run build -w @cookies-et-coquilettes/bff",
@@ -19,6 +20,6 @@
     "screenshots": "node scripts/generate-screenshots.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   }
 }

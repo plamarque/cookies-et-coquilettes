@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: .
     buildCommand: npm ci && npm run build:bff
-    startCommand: npm run start -w @cookies-et-coquilettes/bff
+    startCommand: npm run start:bff:render
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
