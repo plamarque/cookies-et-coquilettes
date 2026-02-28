@@ -861,29 +861,42 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="viewMode === 'DETAIL' && selectedRecipe" class="panel detail">
-      <RecipeImage
-        v-if="selectedRecipe.imageId"
-        :image-id="selectedRecipe.imageId"
-        img-class="recipe-detail-image"
-      />
+      <div class="recipe-detail-header">
+        <RecipeImage
+          v-if="selectedRecipe.imageId"
+          :image-id="selectedRecipe.imageId"
+          img-class="recipe-detail-image"
+        />
+        <div v-else class="recipe-detail-image-placeholder" />
+        <div class="recipe-detail-header-actions">
+          <Button
+            text
+            icon="pi pi-arrow-left"
+            class="recipe-detail-back"
+            aria-label="Retour"
+            @click="backToList"
+          />
+          <button
+            type="button"
+            :class="['recipe-detail-favorite', { 'recipe-detail-favorite--active': selectedRecipe.favorite }]"
+            :aria-label="selectedRecipe.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+            @click="toggleFavorite(selectedRecipe)"
+          >
+            <i :class="selectedRecipe.favorite ? 'pi pi-heart-fill' : 'pi pi-heart'" />
+          </button>
+        </div>
+      </div>
       <div class="row between">
         <h2>{{ selectedRecipe.title }}</h2>
         <div class="row">
-          <Button label="Retour" text icon="pi pi-arrow-left" @click="backToList" />
           <Button
-            :icon="cookingState === 'OFF' ? 'pi pi-moon' : 'pi pi-sun'"
-            :label="cookingState === 'OFF' ? 'Mode cuisine' : 'Mode cuisine'"
+            :icon="cookingState === 'OFF' ? 'pi pi-play' : 'pi pi-sun'"
+            label="Cuisiner"
             text
             :title="cookingState === 'OFF' ? 'Activer mode cuisine' : 'Désactiver mode cuisine'"
             @click="toggleCookingMode"
           />
           <Button label="Éditer" text icon="pi pi-pencil" @click="openEditForm(selectedRecipe)" />
-          <Button
-            :label="selectedRecipe.favorite ? 'Retirer favori' : 'Favori'"
-            text
-            icon="pi pi-heart"
-            @click="toggleFavorite(selectedRecipe)"
-          />
           <Button
             severity="danger"
             text
@@ -894,10 +907,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <p class="muted">
-        {{ selectedRecipe.category }} · base:
-        {{ selectedRecipe.servingsBase ? `${selectedRecipe.servingsBase} portions` : "non définie" }}
-      </p>
       <a
         v-if="selectedRecipe.source?.url"
         :href="selectedRecipe.source.url"
