@@ -7,6 +7,7 @@ export interface ParseRecipeInput {
   text?: string;
   url?: string;
   screenshotBase64?: string;
+  screenshotMimeType?: string;
   shareTitle?: string;
 }
 
@@ -339,10 +340,75 @@ function extractMainText(html: string): string {
   return main.replace(/\s+/g, " ").trim().slice(0, 15000);
 }
 
+interface LlmRecipePayload {
+  title?: string;
+  category?: string;
+  servingsBase?: number;
+  prepTimeMin?: number;
+  cookTimeMin?: number;
+  ingredients?: Array<{
+    label?: string;
+    quantity?: number;
+    unit?: string;
+    isScalable?: boolean;
+  }>;
+  steps?: Array<{ order?: number; text?: string }>;
+}
+
+function parseLlmRecipePayload(raw: string): LlmRecipePayload | null {
+  const json = raw.replace(/^```json?\s*|\s*```$/g, "");
+  try {
+    return JSON.parse(json) as LlmRecipePayload;
+  } catch {
+    return null;
+  }
+}
+
+function toDraftFromLlmPayload(
+  parsed: LlmRecipePayload,
+  sourceType: ImportType,
+  url?: string,
+  imageUrl?: string
+): ParsedRecipeDraft {
+  const title = parsed.title?.trim() || "Recette importée";
+  const category = parsed.category === "SUCRE" ? "SUCRE" : "SALE";
+  const ingredients: IngredientLine[] = (parsed.ingredients ?? []).map((ing, idx) => ({
+    id: `ing-${idx}-${Date.now()}`,
+    label: String(ing.label ?? "").trim(),
+    quantity: typeof ing.quantity === "number" ? ing.quantity : undefined,
+    unit: ing.unit?.trim() || undefined,
+    isScalable: Boolean(ing.isScalable)
+  }));
+  const steps = [...(parsed.steps ?? [])]
+    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+    .map((s, idx) => ({
+      id: `step-${idx}-${Date.now()}`,
+      order: idx + 1,
+      text: String(s.text ?? "").trim()
+    }))
+    .filter((s) => s.text);
+
+  return {
+    title,
+    category,
+    servingsBase: typeof parsed.servingsBase === "number" ? parsed.servingsBase : undefined,
+    ingredients,
+    steps,
+    prepTimeMin: typeof parsed.prepTimeMin === "number" ? parsed.prepTimeMin : undefined,
+    cookTimeMin: typeof parsed.cookTimeMin === "number" ? parsed.cookTimeMin : undefined,
+    imageUrl: imageUrl || undefined,
+    source: {
+      type: sourceType,
+      url: url?.trim() || undefined,
+      capturedAt: new Date().toISOString()
+    }
+  };
+}
+
 async function parseWithOpenAI(
   text: string,
   imageUrl: string | undefined,
-  url: string,
+  url: string | undefined,
   sourceType: ImportType
 ): Promise<ParsedRecipeDraft> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -375,58 +441,81 @@ ${text.slice(0, 12000)}`;
     });
     const raw = completion.choices[0]?.message?.content?.trim();
     if (!raw) return fallbackDraft("Recette importée", sourceType, url);
-
-    const json = raw.replace(/^```json?\s*|\s*```$/g, "");
-    const parsed = JSON.parse(json) as {
-      title?: string;
-      category?: string;
-      servingsBase?: number;
-      prepTimeMin?: number;
-      cookTimeMin?: number;
-      ingredients?: Array<{ label?: string; quantity?: number; unit?: string; isScalable?: boolean }>;
-      steps?: Array<{ order?: number; text?: string }>;
-    };
-
-    const title = parsed.title?.trim() || "Recette importée";
-    const category =
-      parsed.category === "SUCRE" ? "SUCRE" : "SALE";
-    const ingredients: IngredientLine[] = (parsed.ingredients ?? []).map(
-      (ing, idx) => ({
-        id: `ing-${idx}-${Date.now()}`,
-        label: String(ing.label ?? "").trim(),
-        quantity: typeof ing.quantity === "number" ? ing.quantity : undefined,
-        unit: ing.unit?.trim() || undefined,
-        isScalable: Boolean(ing.isScalable)
-      })
-    );
-    const steps = (parsed.steps ?? [])
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-      .map((s, idx) => ({
-        id: `step-${idx}-${Date.now()}`,
-        order: idx + 1,
-        text: String(s.text ?? "").trim()
-      }))
-      .filter((s) => s.text);
-
-    return {
-      title,
-      category,
-      servingsBase: typeof parsed.servingsBase === "number" ? parsed.servingsBase : undefined,
-      ingredients,
-      steps,
-      prepTimeMin: typeof parsed.prepTimeMin === "number" ? parsed.prepTimeMin : undefined,
-      cookTimeMin: typeof parsed.cookTimeMin === "number" ? parsed.cookTimeMin : undefined,
-      imageUrl: imageUrl || undefined,
-      source: {
-        type: sourceType,
-        url,
-        capturedAt: new Date().toISOString()
-      }
-    };
+    const parsed = parseLlmRecipePayload(raw);
+    if (!parsed) {
+      return fallbackDraft("Recette importée", sourceType, url);
+    }
+    return toDraftFromLlmPayload(parsed, sourceType, url, imageUrl);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("OpenAI parse error", err);
     return fallbackDraft("Recette importée", sourceType, url);
+  }
+}
+
+async function parseScreenshotWithOpenAI(
+  screenshotBase64: string,
+  sourceType: ImportType,
+  url?: string,
+  screenshotMimeType?: string
+): Promise<ParsedRecipeDraft> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return fallbackDraft("Recette depuis capture", sourceType, url);
+  }
+
+  const client = new OpenAI({ apiKey });
+  const mimeType =
+    screenshotMimeType && screenshotMimeType.startsWith("image/")
+      ? screenshotMimeType
+      : "image/jpeg";
+  const prompt = `Tu es un assistant qui extrait une recette de cuisine depuis une photo/screenshot.
+Réponds uniquement avec du JSON valide, sans markdown :
+{
+  "title": "titre de la recette",
+  "category": "SUCRE" ou "SALE",
+  "servingsBase": nombre de portions (nombre ou null),
+  "prepTimeMin": temps préparation en minutes (nombre ou null),
+  "cookTimeMin": temps cuisson en minutes (nombre ou null),
+  "ingredients": [{"label": "nom", "quantity": nombre ou null, "unit": "unité", "isScalable": true/false}],
+  "steps": [{"order": 1, "text": "description étape"}]
+}
+Règles :
+- Extraire uniquement ce qui est lisible sur l'image.
+- Si une valeur n'est pas lisible, mettre null (ou [] pour listes).
+- Conserver les ingrédients en français quand possible.
+- Ordonner les étapes dans l'ordre de lecture de la recette.`;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${screenshotBase64}`,
+                detail: "high"
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim();
+    if (!raw) return fallbackDraft("Recette depuis capture", sourceType, url);
+    const parsed = parseLlmRecipePayload(raw);
+    if (!parsed) return fallbackDraft("Recette depuis capture", sourceType, url);
+    return toDraftFromLlmPayload(parsed, sourceType, url);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("OpenAI screenshot parse error", err);
+    return fallbackDraft("Recette depuis capture", sourceType, url);
   }
 }
 
@@ -498,7 +587,7 @@ export async function parseRecipeWithCloud(
   if (sourceType === "TEXT" && input.text) {
     const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
     if (hasOpenAiKey) {
-      return parseWithOpenAI(input.text, undefined, url ?? "", sourceType);
+      return parseWithOpenAI(input.text, undefined, url, sourceType);
     }
     return fallbackDraft("Recette depuis texte", sourceType, url);
   }
@@ -507,13 +596,18 @@ export async function parseRecipeWithCloud(
     const text = input.text ?? input.shareTitle ?? "";
     const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
     if (hasOpenAiKey && text.length > 50) {
-      return parseWithOpenAI(text, undefined, url ?? "", sourceType);
+      return parseWithOpenAI(text, undefined, url, sourceType);
     }
     return fallbackDraft(input.shareTitle ?? "Recette partagée", sourceType, url);
   }
 
   if (sourceType === "SCREENSHOT" && input.screenshotBase64) {
-    return fallbackDraft("Recette depuis capture", sourceType, url);
+    return parseScreenshotWithOpenAI(
+      input.screenshotBase64,
+      sourceType,
+      url,
+      input.screenshotMimeType
+    );
   }
 
   return fallbackDraft("Recette importée", sourceType, url);

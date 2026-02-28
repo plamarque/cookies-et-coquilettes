@@ -20,6 +20,7 @@ import { bffImportService, generateRecipeImage } from "./services/import-service
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT";
+type ImportProgressType = "url" | "text" | "screenshot" | "file";
 
 interface IngredientInput {
   id: string;
@@ -75,7 +76,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const formImageInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
-const importSourceType = ref<"url" | "text" | "file" | null>(null);
+const importSourceType = ref<ImportProgressType | null>(null);
 const imageGenerating = ref(false);
 const imageReextracting = ref(false);
 const recipeIdWithPendingImage = ref<string | null>(null);
@@ -188,19 +189,48 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
   };
 }
 
+function sourceTypeLabel(source?: ImportSource): string {
+  switch (source?.type) {
+    case "SCREENSHOT":
+      return "Image collée";
+    case "TEXT":
+      return "Texte collé";
+    case "SHARE":
+      return "Partage";
+    case "URL":
+      return "URL";
+    case "MANUAL":
+      return "Saisie manuelle";
+    default:
+      return "Import";
+  }
+}
+
+function importBusyLabel(type: ImportProgressType | null): string {
+  switch (type) {
+    case "url":
+      return "Analyse de l'URL en cours…";
+    case "text":
+      return "Analyse du texte en cours…";
+    case "screenshot":
+      return "Lecture de l'image en cours…";
+    case "file":
+      return "Lecture du fichier en cours…";
+    default:
+      return "Import en cours…";
+  }
+}
+
 function formToRecipe(existing?: Recipe): Recipe {
   const now = new Date().toISOString();
   const servingsBase = parseNumber(form.value.servingsBase);
-  const sourceUrl = form.value.source?.url?.trim();
-  const source = sourceUrl
+  const source = form.value.source
     ? {
-        type: form.value.source!.type,
-        url: sourceUrl,
-        capturedAt: form.value.source!.capturedAt
+        type: form.value.source.type,
+        url: form.value.source.url?.trim() || undefined,
+        capturedAt: form.value.source.capturedAt
       }
-    : existing?.source?.url
-      ? existing.source
-      : undefined;
+    : existing?.source;
   const ingredients = form.value.ingredients
     .map((ingredient) => {
       const label = ingredient.label.trim();
@@ -373,10 +403,11 @@ function onPasteInField(ev: ClipboardEvent): void {
 async function runImportFromFile(file: File): Promise<void> {
   clearMessages();
   importBusy.value = true;
-  importSourceType.value = "file";
+  const isImageFile = file.type.startsWith("image/");
+  importSourceType.value = isImageFile ? "screenshot" : "file";
   try {
     let draft: ParsedRecipeDraft;
-    if (file.type.startsWith("image/")) {
+    if (isImageFile) {
       draft = await bffImportService.importFromScreenshot(file);
     } else {
       const text = await file.text();
@@ -449,6 +480,21 @@ function isMinimalFallbackDraft(draft: ParsedRecipeDraft): boolean {
   return !hasIngredients && !hasSteps;
 }
 
+function fallbackImportMessage(source?: ImportSource): string {
+  switch (source?.type) {
+    case "SCREENSHOT":
+      return "La lecture de l'image a échoué. Vérifiez que la photo est lisible, puis complétez manuellement si besoin.";
+    case "TEXT":
+      return "L'extraction du texte a échoué. Complétez manuellement la recette.";
+    case "SHARE":
+      return "L'extraction du partage a échoué. Complétez manuellement la recette.";
+    case "URL":
+      return "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
+    default:
+      return "L'extraction a échoué. Complétez manuellement la recette.";
+  }
+}
+
 async function createRecipeFromDraft(draft: ParsedRecipeDraft): Promise<void> {
   clearMessages();
   form.value = draftToForm(draft);
@@ -471,8 +517,7 @@ async function createRecipeFromDraft(draft: ParsedRecipeDraft): Promise<void> {
     formRecipeId.value = recipe.id;
     form.value = toForm(recipe);
     viewMode.value = "FORM";
-    feedback.value =
-      "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
+    feedback.value = fallbackImportMessage(draft.source);
   } else {
     viewMode.value = "DETAIL";
     feedback.value = "Recette importée.";
@@ -891,12 +936,12 @@ onMounted(async () => {
       </div>
 
       <div
-        v-if="importBusy && importSourceType === 'url'"
+        v-if="importBusy"
         class="import-analyzing"
         aria-live="polite"
       >
         <ProgressSpinner style="width: 2.5rem; height: 2.5rem" strokeWidth="4" />
-        <p>Analyse de la recette en cours…</p>
+        <p>{{ importBusyLabel(importSourceType) }}</p>
       </div>
 
       <div class="stack">
@@ -1003,6 +1048,10 @@ onMounted(async () => {
         <i class="pi pi-external-link" />
         Voir la recette originale
       </a>
+      <p v-else-if="selectedRecipe.source" class="source-hint">
+        <i class="pi pi-paperclip" />
+        Source : {{ sourceTypeLabel(selectedRecipe.source) }}
+      </p>
 
       <!-- Portions UI masquée (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED && selectedRecipe.servingsBase" -->
       <div v-if="false" class="servings-tools">
@@ -1069,6 +1118,9 @@ onMounted(async () => {
             @click="triggerFullReextract"
           />
         </div>
+        <small v-if="form.source && !form.source.url" class="muted">
+          Source import : {{ sourceTypeLabel(form.source) }}
+        </small>
       </div>
 
       <div class="stack">

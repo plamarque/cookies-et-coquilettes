@@ -71,7 +71,8 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
   const screenshotBase64 = req.file.buffer.toString("base64");
   const parsed = await parseRecipeWithCloud({
     sourceType: "SCREENSHOT",
-    screenshotBase64
+    screenshotBase64,
+    screenshotMimeType: req.file.mimetype
   });
   res.json(parsed);
 });
