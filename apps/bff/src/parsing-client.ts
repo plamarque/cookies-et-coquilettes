@@ -1,8 +1,4 @@
-import type {
-  IngredientLine,
-  ImportType,
-  ParsedRecipeDraft
-} from "@cookies-et-coquilettes/domain";
+import type { IngredientLine, ImportType, ParsedRecipeDraft } from "./types.js";
 
 export interface ParseRecipeInput {
   sourceType: ImportType;
