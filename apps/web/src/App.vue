@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
-import Tag from "primevue/tag";
 import type {
   ImportSource,
   ParsedRecipeDraft,
@@ -60,7 +59,7 @@ const errorMessage = ref<string>("");
 
 const search = ref("");
 const categoryFilter = ref<"ALL" | RecipeCategory>("ALL");
-const favoriteOnly = ref(false);
+const favoriteOnly = ref(true);
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const formImageInputRef = ref<HTMLInputElement | null>(null);
@@ -623,6 +622,21 @@ async function deleteRecipe(recipe: Recipe): Promise<void> {
   }
 }
 
+function formatRecipeTime(recipe: Recipe): string {
+  const prep = recipe.prepTimeMin;
+  const cook = recipe.cookTimeMin;
+  if (prep && cook) {
+    return `${prep} min préparation, ${cook} min cuisson`;
+  }
+  if (prep) {
+    return `${prep} min préparation`;
+  }
+  if (cook) {
+    return `${cook} min cuisson`;
+  }
+  return "";
+}
+
 async function toggleFavorite(recipe: Recipe): Promise<void> {
   clearMessages();
   try {
@@ -754,29 +768,30 @@ onMounted(async () => {
           @click="openDetail(recipe)"
         >
           <template #header>
-            <RecipeImage
-              v-if="recipe.imageId"
-              :image-id="recipe.imageId"
-              img-class="recipe-card-image"
-            />
+            <div class="recipe-card-header">
+              <RecipeImage
+                v-if="recipe.imageId"
+                :image-id="recipe.imageId"
+                img-class="recipe-card-image"
+              />
+              <div v-else class="recipe-card-image-placeholder" />
+              <button
+                type="button"
+                :class="['recipe-card-favorite', { 'recipe-card-favorite--active': recipe.favorite }]"
+                :aria-label="recipe.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                @click.stop="toggleFavorite(recipe)"
+              >
+                <i :class="recipe.favorite ? 'pi pi-heart-fill' : 'pi pi-heart'" />
+              </button>
+            </div>
           </template>
           <template #title>{{ recipe.title }}</template>
           <template #subtitle>
-            {{ recipe.category }} · modifiée {{ new Date(recipe.updatedAt).toLocaleString("fr-FR") }}
+            {{ formatRecipeTime(recipe) }}
           </template>
           <template #content>
-            <p>{{ recipe.ingredients.length }} ingrédient(s)</p>
-            <p>{{ recipe.steps.length }} étape(s)</p>
-            <div class="row">
-              <Tag v-if="recipe.favorite" value="Favori" />
-              <Button
-                text
-                size="small"
-                icon="pi pi-heart"
-                :label="recipe.favorite ? 'Retirer favori' : 'Ajouter favori'"
-                @click.stop="toggleFavorite(recipe)"
-              />
-            </div>
+            <p>{{ recipe.ingredients.length }} ingrédients</p>
+            <p>{{ recipe.steps.length }} étapes</p>
           </template>
         </Card>
 

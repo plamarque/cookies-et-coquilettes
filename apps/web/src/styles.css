@@ -31,12 +31,61 @@ body {
   cursor: pointer;
 }
 
+.recipe-card [data-pc-section="header"],
+.recipe-card .p-card-header {
+  overflow: visible;
+}
+
+.recipe-card-header {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
 .recipe-card-image {
   width: 100%;
   height: 160px;
   object-fit: cover;
   display: block;
   border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.recipe-card-image-placeholder {
+  width: 100%;
+  height: 160px;
+  background: rgba(31, 79, 70, 0.08);
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.recipe-card-favorite {
+  position: absolute !important;
+  top: 0.5rem !important;
+  right: 0.5rem !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 2;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: var(--p-button-color);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.recipe-card-favorite:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+.recipe-card-favorite--active {
+  color: var(--p-primary-color, #1f4f46);
 }
 
 .recipe-detail-image {
