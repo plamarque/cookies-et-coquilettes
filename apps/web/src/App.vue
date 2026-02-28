@@ -12,7 +12,9 @@ import type {
   RecipeFilters
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
-import { dexieRecipeService, storeImageFromUrl } from "./services/recipe-service";
+import RecipeImage from "./components/RecipeImage.vue";
+import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
+import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService } from "./services/import-service";
 
@@ -43,6 +45,7 @@ interface RecipeFormState {
   steps: StepInput[];
   source?: ImportSource;
   imageUrl?: string;
+  imageId?: string | null;
 }
 
 const recipes = ref<Recipe[]>([]);
@@ -59,6 +62,7 @@ const categoryFilter = ref<"ALL" | RecipeCategory>("ALL");
 const favoriteOnly = ref(false);
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const formImageInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
 const importSourceType = ref<"url" | "text" | "file" | null>(null);
@@ -132,7 +136,8 @@ function toForm(recipe: Recipe): RecipeFormState {
             .sort((a, b) => a.order - b.order)
             .map((step) => ({ id: step.id, text: step.text }))
         : [emptyStep()],
-    source: recipe.source
+    source: recipe.source,
+    imageId: recipe.imageId
   };
 }
 
@@ -145,6 +150,7 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
     prepTimeMin: draft.prepTimeMin ? String(draft.prepTimeMin) : "",
     cookTimeMin: draft.cookTimeMin ? String(draft.cookTimeMin) : "",
     imageUrl: draft.imageUrl,
+    imageId: undefined,
     ingredients:
       draft.ingredients.length > 0
         ? draft.ingredients.map((ingredient) => ({
@@ -228,7 +234,10 @@ function formToRecipe(existing?: Recipe): Recipe {
     prepTimeMin: parseNumber(form.value.prepTimeMin),
     cookTimeMin: parseNumber(form.value.cookTimeMin),
     source,
-    imageId: existing?.imageId,
+    imageId:
+      form.value.imageId === null
+        ? undefined
+        : form.value.imageId ?? existing?.imageId,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now
   };
@@ -448,6 +457,27 @@ function addStep(): void {
   form.value.steps.push(emptyStep());
 }
 
+function triggerFormImagePick(): void {
+  formImageInputRef.value?.click();
+}
+
+async function onFormImagePicked(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = "";
+  if (!file?.type.startsWith("image/")) return;
+  const imageId = await storeImageFromFile(file);
+  if (imageId) {
+    form.value.imageId = imageId;
+    form.value.imageUrl = undefined;
+  }
+}
+
+function removeFormImage(): void {
+  form.value.imageId = null;
+  form.value.imageUrl = undefined;
+}
+
 function removeStep(id: string): void {
   form.value.steps = form.value.steps.filter((step) => step.id !== id);
   if (form.value.steps.length === 0) {
@@ -464,7 +494,7 @@ async function saveForm(): Promise<void> {
         : undefined;
     let recipe = formToRecipe(existing);
 
-    if (!existing && form.value.imageUrl) {
+    if (!recipe.imageId && !existing && form.value.imageUrl) {
       const imageId = await storeImageFromUrl(form.value.imageUrl);
       if (imageId) {
         recipe = { ...recipe, imageId };
@@ -472,6 +502,9 @@ async function saveForm(): Promise<void> {
     }
 
     if (existing) {
+      if (existing.imageId && !recipe.imageId) {
+        await db.images.delete(existing.imageId);
+      }
       await dexieRecipeService.updateRecipe(existing.id, recipe);
       feedback.value = "Recette modifiée.";
       selectedRecipeId.value = existing.id;
@@ -640,6 +673,13 @@ onMounted(async () => {
           class="recipe-card"
           @click="openDetail(recipe)"
         >
+          <template #header>
+            <RecipeImage
+              v-if="recipe.imageId"
+              :image-id="recipe.imageId"
+              img-class="recipe-card-image"
+            />
+          </template>
           <template #title>{{ recipe.title }}</template>
           <template #subtitle>
             {{ recipe.category }} · modifiée {{ new Date(recipe.updatedAt).toLocaleString("fr-FR") }}
@@ -726,6 +766,11 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="viewMode === 'DETAIL' && selectedRecipe" class="panel detail">
+      <RecipeImage
+        v-if="selectedRecipe.imageId"
+        :image-id="selectedRecipe.imageId"
+        img-class="recipe-detail-image"
+      />
       <div class="row between">
         <h2>{{ selectedRecipe.title }}</h2>
         <div class="row">
@@ -799,6 +844,55 @@ onMounted(async () => {
       <div class="stack">
         <label for="title">Titre</label>
         <input id="title" v-model="form.title" type="text" placeholder="Ex: Cookies noisette" />
+      </div>
+
+      <div class="stack">
+        <label>Image</label>
+        <div v-if="form.imageUrl || (form.imageId && typeof form.imageId === 'string')" class="row" style="align-items: flex-start">
+          <RecipeImage
+            v-if="form.imageId && typeof form.imageId === 'string'"
+            :image-id="form.imageId"
+            img-class="recipe-form-image"
+          />
+          <img
+            v-else-if="form.imageUrl"
+            :src="form.imageUrl"
+            alt="Aperçu import"
+            class="recipe-form-image"
+          />
+          <div class="row" style="gap: 0.5rem; margin-left: 0.5rem">
+            <Button
+              text
+              size="small"
+              icon="pi pi-upload"
+              label="Changer"
+              @click="triggerFormImagePick"
+            />
+            <Button
+              text
+              size="small"
+              severity="secondary"
+              icon="pi pi-times"
+              label="Supprimer"
+              @click="removeFormImage"
+            />
+          </div>
+        </div>
+        <Button
+          v-else
+          text
+          size="small"
+          icon="pi pi-image"
+          label="Ajouter une image"
+          @click="triggerFormImagePick"
+        />
+        <input
+          ref="formImageInputRef"
+          type="file"
+          accept="image/*"
+          class="hidden-file-input"
+          @change="onFormImagePicked"
+        />
       </div>
 
       <div class="row">

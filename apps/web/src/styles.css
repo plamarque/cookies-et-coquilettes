@@ -31,6 +31,30 @@ body {
   cursor: pointer;
 }
 
+.recipe-card-image {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  display: block;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.recipe-detail-image {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.recipe-form-image {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+}
+
 .empty-card {
   border: 1px dashed rgba(31, 79, 70, 0.45);
 }

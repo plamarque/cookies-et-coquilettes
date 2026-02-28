@@ -52,10 +52,16 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 
 ### Consultation et exécution
 
-1. L’écran détail affiche ingrédients, quantités, portions et étapes ordonnées.
-2. L’utilisateur peut modifier les portions ; les quantités sont recalculées immédiatement.
-3. L’utilisateur peut réinitialiser les portions à la valeur de base.
-4. Le mode cuisine (anti-veille) est activable uniquement depuis l'écran détail d'une recette ouverte.
+1. Les vignettes (cartes) affichent la photo de la recette lorsqu'elle existe.
+2. L'écran détail affiche l'image en en-tête, puis ingrédients, quantités, portions et étapes ordonnées.
+3. L'utilisateur peut modifier les portions ; les quantités sont recalculées immédiatement.
+4. L'utilisateur peut réinitialiser les portions à la valeur de base.
+5. Le mode cuisine (anti-veille) est activable uniquement depuis l'écran détail d'une recette ouverte.
+
+### Image de recette
+
+1. L'image est affichée sur les cartes, dans l'en-tête du détail et dans le formulaire d'édition.
+2. L'utilisateur peut ajouter, modifier ou supprimer l'image depuis le formulaire recette.
 
 ### Édition
 

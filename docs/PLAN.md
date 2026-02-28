@@ -10,7 +10,7 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 |-------|----------|--------|
 | A | Invariants domaine + types partagés (`quantityBase`, validation, règles import/suppression) | En cours |
 | B | Persistance Dexie + `recipe-service` (CRUD/favoris/scale immuable/tri) | En cours |
-| C | CRUD UI (liste, détail, formulaire) avec sauvegarde explicite | En cours |
+| C | CRUD UI (liste, détail, formulaire) avec sauvegarde explicite, affichage et édition image | En cours |
 | D | Recherche et filtres (`Sucré/Salé`, favoris, texte titre+ingrédients) | En cours |
 | E | Import complet + revue obligatoire + fallback draft manuel | En cours |
 | F | Mode cuisine Wake Lock + fallback non bloquant | En cours |

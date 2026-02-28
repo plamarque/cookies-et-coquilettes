@@ -71,4 +71,40 @@ test.describe("Cookies & Coquillettes v1", () => {
     await expect(page.getByText("Recette importée et enregistrée.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Omelette review" })).toBeVisible();
   });
+
+  test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
+    page
+  }) => {
+    await page.goto("/");
+    const imagePath = path.join(process.cwd(), "e2e", "fixtures", "test-image.png");
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Nouvelle recette" }).click();
+    await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
+    await page.getByRole("button", { name: "Saisir à la main" }).click();
+    await page.getByLabel("Titre").fill("Recette avec image");
+    await page.getByLabel(/step-text-/).first().fill("Étape 1");
+    await page.getByRole("button", { name: "Ajouter une image" }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(imagePath);
+    await page.getByRole("button", { name: "Enregistrer" }).click();
+
+    await expect(page.getByRole("heading", { name: "Recette avec image" })).toBeVisible();
+    await expect(page.getByAltText("Photo de la recette").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Retour" }).click();
+    const cardImage = page.locator(".recipe-card-image").first();
+    await expect(cardImage).toBeVisible();
+
+    await page.getByText("Recette avec image").first().click();
+    await expect(page.locator(".recipe-detail-image")).toBeVisible();
+
+    await page.getByRole("button", { name: "Modifier" }).click();
+    await expect(page.locator(".recipe-form-image")).toBeVisible();
+    await page.getByRole("button", { name: "Supprimer" }).first().click();
+    await page.getByRole("button", { name: "Enregistrer" }).click();
+
+    await page.getByRole("button", { name: "Retour" }).click();
+    await expect(page.locator(".recipe-card-image")).not.toBeVisible();
+  });
 });

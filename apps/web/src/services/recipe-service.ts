@@ -31,6 +31,30 @@ export async function storeImageFromUrl(url: string): Promise<string | undefined
   }
 }
 
+export async function getImageBlobUrl(imageId: string): Promise<string | undefined> {
+  const row = await db.images.get(imageId);
+  if (!row?.blob) return undefined;
+  return URL.createObjectURL(row.blob);
+}
+
+export async function storeImageFromFile(file: File): Promise<string | undefined> {
+  if (!file.type.startsWith("image/")) return undefined;
+  try {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await db.images.add({
+      id,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      createdAt: now,
+      blob: file
+    });
+    return id;
+  } catch {
+    return undefined;
+  }
+}
+
 function bySearch(recipe: Recipe, search?: string): boolean {
   if (!search) {
     return true;

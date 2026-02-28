@@ -194,6 +194,27 @@ function extractOgImage(html: string, baseUrl: string): string | undefined {
   return undefined;
 }
 
+/** Extrait une URL TwicPics (CDN avec CORS) depuis srcset/src si l'image JSON-LD vient d'un domaine sans CORS (ex. sebplatform). */
+function extractTwicPicsImage(
+  html: string,
+  jsonLdImageUrl: string | undefined
+): string | undefined {
+  if (!jsonLdImageUrl) return undefined;
+  const match = jsonLdImageUrl.match(/\/([a-f0-9-]+\.(?:jpg|jpeg|png|webp))(?:\?|$)/i);
+  if (!match) return undefined;
+  const filename = match[1];
+  const twicMatch = html.match(
+    new RegExp(
+      `(https://twicpics\\.[^/]+/https?://[^"\\s]*${filename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^"\\s]*)`,
+      "i"
+    )
+  );
+  if (twicMatch) {
+    return twicMatch[1].replace(/&amp;/g, "&");
+  }
+  return undefined;
+}
+
 function extractMainText(html: string): string {
   const $ = cheerio.load(html);
   $("script, style, nav, header, footer, aside, .ad, .ads").remove();
@@ -323,8 +344,12 @@ export async function parseRecipeWithCloud(
       const ogImage = extractOgImage(html, baseUrl);
 
       if (jsonLdDraft && jsonLdDraft.ingredients.length + jsonLdDraft.steps.length > 0) {
-        if (!jsonLdDraft.imageUrl && ogImage) {
+        // Préférer og:image ou TwicPics (CDN avec CORS) pour éviter blocage affichage
+        const twicImage = extractTwicPicsImage(html, jsonLdDraft.imageUrl);
+        if (ogImage) {
           jsonLdDraft.imageUrl = ogImage;
+        } else if (twicImage) {
+          jsonLdDraft.imageUrl = twicImage;
         }
         return jsonLdDraft;
       }
