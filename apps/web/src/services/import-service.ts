@@ -53,7 +53,11 @@ async function parseResponse(response: Response): Promise<ParsedRecipeDraft> {
   return (await response.json()) as ParsedRecipeDraft;
 }
 
-function fallbackDraft(type: ImportType, seed?: string): ParsedRecipeDraft {
+function fallbackDraft(
+  type: ImportType,
+  seed?: string,
+  url?: string
+): ParsedRecipeDraft {
   const title = seed?.trim() ? seed.trim() : "Recette importée";
   return {
     title,
@@ -62,6 +66,7 @@ function fallbackDraft(type: ImportType, seed?: string): ParsedRecipeDraft {
     steps: [],
     source: {
       type,
+      url: url?.trim() || undefined,
       capturedAt: new Date().toISOString()
     }
   };
@@ -117,7 +122,7 @@ class BffImportService implements ImportService {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn("importFromUrl fallback draft", error);
-      return fallbackDraft("URL", "Recette depuis URL");
+      return fallbackDraft("URL", "Recette depuis URL", url);
     }
   }
 

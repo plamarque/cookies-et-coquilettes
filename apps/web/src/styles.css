@@ -109,6 +109,14 @@ body {
   border-radius: 0.75rem;
 }
 
+.recipe-detail-image-placeholder--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(31, 79, 70, 0.6);
+  font-size: 0.9rem;
+}
+
 .recipe-detail-header-actions {
   position: absolute;
   top: 0.5rem;

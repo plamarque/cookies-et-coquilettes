@@ -19,7 +19,7 @@ import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService, generateRecipeImage } from "./services/import-service";
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
-type FormMode = "CREATE" | "EDIT" | "IMPORT_REVIEW";
+type FormMode = "CREATE" | "EDIT";
 
 interface IngredientInput {
   id: string;
@@ -68,6 +68,8 @@ const importBusy = ref(false);
 const importSourceType = ref<"url" | "text" | "file" | null>(null);
 const imageGenerating = ref(false);
 const imageReextracting = ref(false);
+const recipeIdWithPendingImage = ref<string | null>(null);
+const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
 
@@ -333,7 +335,7 @@ async function runImportFromPasteField(): Promise<void> {
       draft = await bffImportService.importFromText(content);
     }
     pasteFieldContent.value = "";
-    openImportReview(draft);
+    await createRecipeFromDraft(draft);
   } catch (error) {
     setError(error);
   } finally {
@@ -368,7 +370,7 @@ async function runImportFromFile(file: File): Promise<void> {
       const text = await file.text();
       draft = await bffImportService.importFromText(text);
     }
-    openImportReview(draft);
+    await createRecipeFromDraft(draft);
   } catch (error) {
     setError(error);
   } finally {
@@ -429,28 +431,82 @@ async function openEditForm(recipe: Recipe): Promise<void> {
   viewMode.value = "FORM";
 }
 
-function openImportReview(draft: ParsedRecipeDraft): void {
-  clearMessages();
-  formMode.value = "IMPORT_REVIEW";
-  formRecipeId.value = null;
-  form.value = draftToForm(draft);
-  viewMode.value = "FORM";
-  imageGenerating.value = false;
+function isMinimalFallbackDraft(draft: ParsedRecipeDraft): boolean {
+  const hasIngredients = draft.ingredients.some((i) => (i.label ?? "").trim());
+  const hasSteps = draft.steps.some((s) => (s.text ?? "").trim());
+  return !hasIngredients && !hasSteps;
+}
 
-  if (!draft.imageUrl && !form.value.imageId && draft.title?.trim()) {
-    imageGenerating.value = true;
+async function createRecipeFromDraft(draft: ParsedRecipeDraft): Promise<void> {
+  clearMessages();
+  form.value = draftToForm(draft);
+  let recipe = formToRecipe(undefined); // sans image, on la traite en async
+
+  if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
+    recipe = {
+      ...recipe,
+      steps: [{ id: randomId(), order: 1, text: "À compléter" }]
+    };
+  }
+
+  await dexieRecipeService.createRecipe(recipe);
+  selectedRecipeId.value = recipe.id;
+  favoriteOnly.value = false;
+  await refresh();
+
+  if (isMinimalFallbackDraft(draft)) {
+    formMode.value = "EDIT";
+    formRecipeId.value = recipe.id;
+    form.value = toForm(recipe);
+    viewMode.value = "FORM";
+    feedback.value =
+      "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
+  } else {
+    viewMode.value = "DETAIL";
+    feedback.value = "Recette importée.";
+    startAsyncImageForRecipe(recipe.id, draft);
+  }
+}
+
+function startAsyncImageForRecipe(recipeId: string, draft: ParsedRecipeDraft): void {
+  if (draft.imageUrl) {
+    recipeIdWithPendingImage.value = recipeId;
+    imageLoadingMessage.value = "Extraction de l'image...";
+    storeImageFromUrl(draft.imageUrl)
+      .then(async (imageId) => {
+        if (imageId && selectedRecipeId.value === recipeId) {
+          await dexieRecipeService.updateRecipe(recipeId, { imageId });
+          await refresh();
+        }
+      })
+      .finally(() => {
+        if (recipeIdWithPendingImage.value === recipeId) {
+          recipeIdWithPendingImage.value = null;
+          imageLoadingMessage.value = "";
+        }
+      });
+  } else if (draft.title?.trim()) {
+    recipeIdWithPendingImage.value = recipeId;
+    imageLoadingMessage.value = "Génération de l'image...";
     generateRecipeImage({
       title: draft.title,
       ingredients: draft.ingredients,
       steps: draft.steps
     })
-      .then((imageUrl) => {
-        if (imageUrl && imageGenerating.value) {
-          form.value.imageUrl = imageUrl;
+      .then(async (imageUrl) => {
+        if (imageUrl && selectedRecipeId.value === recipeId) {
+          const imageId = await storeImageFromUrl(imageUrl);
+          if (imageId) {
+            await dexieRecipeService.updateRecipe(recipeId, { imageId });
+            await refresh();
+          }
         }
       })
       .finally(() => {
-        imageGenerating.value = false;
+        if (recipeIdWithPendingImage.value === recipeId) {
+          recipeIdWithPendingImage.value = null;
+          imageLoadingMessage.value = "";
+        }
       });
   }
 }
@@ -588,10 +644,7 @@ async function saveForm(): Promise<void> {
       selectedRecipeId.value = existing.id;
     } else {
       await dexieRecipeService.createRecipe(recipe);
-      feedback.value =
-        formMode.value === "IMPORT_REVIEW"
-          ? "Recette importée et enregistrée."
-          : "Recette créée.";
+      feedback.value = "Recette créée.";
       selectedRecipeId.value = recipe.id;
       // Désactiver le filtre favoris pour que la nouvelle recette apparaisse
       favoriteOnly.value = false;
@@ -869,6 +922,12 @@ onMounted(async () => {
           :image-id="selectedRecipe.imageId"
           img-class="recipe-detail-image"
         />
+        <div
+          v-else-if="selectedRecipe.id === recipeIdWithPendingImage"
+          class="recipe-detail-image-placeholder recipe-detail-image-placeholder--loading"
+        >
+          {{ imageLoadingMessage }}
+        </div>
         <div v-else class="recipe-detail-image-placeholder" />
         <div class="recipe-detail-header-actions">
           <Button
@@ -946,13 +1005,7 @@ onMounted(async () => {
     <section v-else-if="viewMode === 'FORM'" class="panel form-panel">
       <div class="row between">
         <h2>
-          {{
-            formMode === "IMPORT_REVIEW"
-              ? "Revue d'import (obligatoire)"
-              : formMode === "EDIT"
-                ? "Éditer recette"
-                : "Nouvelle recette"
-          }}
+          {{ formMode === "EDIT" ? "Éditer recette" : "Nouvelle recette" }}
         </h2>
         <Button label="Annuler" text icon="pi pi-times" @click="backToList" />
       </div>

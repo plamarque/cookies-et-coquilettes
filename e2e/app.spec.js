@@ -12,7 +12,7 @@ async function createRecipeViaManual(page, name = "Cookies test") {
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
 
-async function createRecipeViaImport(page, name, recipeText = "Recette brute") {
+async function createRecipeViaImport(page, recipeText = "Recette brute") {
   const tmpDir = path.join(process.cwd(), "e2e", "tmp");
   mkdirSync(tmpDir, { recursive: true });
   const filePath = path.join(tmpDir, "recipe.txt");
@@ -25,11 +25,8 @@ async function createRecipeViaImport(page, name, recipeText = "Recette brute") {
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(filePath);
 
-  await expect(page.getByRole("heading", { name: "Revue d'import (obligatoire)" })).toBeVisible();
-  await page.getByLabel("Titre").fill(name);
-  await page.getByLabel(/step-text-/).first().fill("Mélanger les ingrédients");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByText("Recette importée.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
 }
 
 test.describe("Cookies & Coquillettes v1", () => {
@@ -66,11 +63,11 @@ test.describe("Cookies & Coquillettes v1", () => {
     await expect(page.getByText("Recette supprimée.")).toBeVisible();
   });
 
-  test("import fichier ouvre la revue obligatoire avant sauvegarde", async ({ page }) => {
+  test("import fichier crée la recette directement", async ({ page }) => {
     await page.goto("/");
-    await createRecipeViaImport(page, "Omelette review", "Recette: Omelette");
-    await expect(page.getByText("Recette importée et enregistrée.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Omelette review" })).toBeVisible();
+    await createRecipeViaImport(page, "Recette: Omelette");
+    await expect(page.getByText("Recette importée.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
   });
 
   test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
@@ -100,7 +97,7 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.getByText("Recette avec image").first().click();
     await expect(page.locator(".recipe-detail-image")).toBeVisible();
 
-    await page.getByRole("button", { name: "Modifier" }).click();
+    await page.getByRole("button", { name: "Éditer" }).click();
     await expect(page.locator(".recipe-form-image")).toBeVisible();
     await page.getByRole("button", { name: "Supprimer" }).first().click();
     await page.getByRole("button", { name: "Enregistrer" }).click();

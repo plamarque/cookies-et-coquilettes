@@ -23,7 +23,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 9. Fonctionnement local sans compte utilisateur (stockage local-only).
 10. Suppression définitive d’une recette avec confirmation explicite.
 11. Sauvegarde explicite du formulaire recette (`Enregistrer` / `Annuler`).
-12. Flux d’import avec revue obligatoire avant création finale.
+12. Import direct : création immédiate de la recette, édition possible à tout moment.
 
 ### Hors périmètre v1
 
@@ -39,8 +39,8 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 
 1. L’utilisateur peut saisir une recette entièrement à la main.
 2. L’utilisateur peut importer une recette via partage, depuis l'écran « Nouvelle recette » : collage (URL/texte/image) + Importer, ou choix fichier, ou saisie manuelle.
-3. Toute recette importée passe par un écran de revue/édition avant création définitive.
-4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement.
+3. Toute recette importée est créée immédiatement et affichée ; l'utilisateur peut l'éditer à tout moment si besoin.
+4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement via l'édition.
 
 ### Organisation et recherche rapide
 
@@ -64,7 +64,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 2. L'utilisateur peut ajouter, modifier ou supprimer l'image depuis le formulaire recette.
 3. Lorsqu'aucune image n'est extraite à l'import (URL, texte, partage), l'application tente de générer une image automatiquement à partir du titre, des ingrédients et de la description de la recette.
 4. L'image générée adopte un style plat, type photo de plat Instagram : élégant, professionnel, appétissant.
-5. Pendant la génération, un placeholder est affiché ; si la génération est rapide, l'image s'affiche immédiatement dès qu'elle est prête.
+5. À l'import, l'image est traitée en arrière-plan (extraction ou génération) ; un placeholder avec message s'affiche pendant ce temps.
 
 ### Images des ingrédients
 
@@ -86,7 +86,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 2. Retrouver une recette en moins de 10 secondes via vignettes + filtres (`Sucré`, `Salé`, `Favoris`).
 3. Changer le nombre de portions et observer la mise à jour des quantités sans latence perceptible.
 4. Consulter et modifier les recettes sans connexion réseau.
-5. Finaliser un import en passant par une revue éditable, y compris en mode fallback hors-ligne.
+5. Finaliser un import directement ; éditer la recette si besoin, y compris en mode fallback hors-ligne.
 
 ## Contraintes fonctionnelles
 

@@ -59,7 +59,7 @@ Règles de contrat :
 - `importFromText(text)`
 
 Règles de contrat :
-- flux en 2 étapes obligatoire : `parse -> draft review -> create`,
+- flux direct : `parse -> create -> détail` ; image en arrière-plan si absente,
 - en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
 
 ### Cooking mode service
@@ -93,7 +93,7 @@ Index minimaux :
 1. Les données brutes (URL, texte, screenshot, payload de partage) sont normalisées côté front.
 2. L’extraction OCR/parsing est déléguée au BFF.
 3. Le BFF protège les clés cloud et renvoie un draft éditable.
-4. Le front impose une revue utilisateur avant création de recette.
+4. Le front crée la recette immédiatement et affiche le détail ; l'image est traitée en arrière-plan si absente.
 5. En cas d’échec partiel ou BFF indisponible, le front et/ou le BFF renvoient un draft fallback minimal.
 
 ### Stratégie de parsing (import URL pages web)
