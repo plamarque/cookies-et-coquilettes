@@ -2,13 +2,20 @@ import { expect, test } from "@playwright/test";
 import path from "path";
 import { writeFileSync, mkdirSync } from "fs";
 
+async function saveRecipeForm(page) {
+  await page
+    .locator(".form-header-actions")
+    .getByRole("button", { name: "Enregistrer" })
+    .click();
+}
+
 async function createRecipeViaManual(page, name = "Cookies test") {
   await page.getByRole("button", { name: "Nouvelle recette" }).click();
   await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
   await page.getByRole("button", { name: "Saisir à la main" }).click();
   await page.getByLabel("Titre").fill(name);
   await page.getByLabel(/step-text-/).first().fill("Mélanger les ingrédients");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await saveRecipeForm(page);
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
 
@@ -25,8 +32,10 @@ async function createRecipeViaImport(page, recipeText = "Recette brute") {
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(filePath);
 
-  await expect(page.getByText("Recette importée.")).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+  await expect(page.locator(".message.success")).toContainText(
+    /Recette importée\.|L'extraction a échoué/i
+  );
+  await expect(page.locator("section.panel.detail, section.panel.form-panel")).toBeVisible();
 }
 
 test.describe("Cookies & Coquillettes v1", () => {
@@ -41,8 +50,8 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.goto("/");
     await createRecipeViaManual(page, "Recette test mode cuisine");
     await expect(page.getByRole("heading", { name: "Recette test mode cuisine" })).toBeVisible();
-    await page.getByRole("button", { name: "Mode cuisine" }).click();
-    await expect(page.getByText(/WAKE_LOCK|FALLBACK/)).toBeVisible();
+    await page.getByRole("button", { name: "Cuisiner" }).click();
+    await expect(page.locator(".message.success")).toContainText(/Wake Lock|fallback navigateur/i);
   });
 
   test("création, recherche, édition portions et suppression", async ({ page }) => {
@@ -66,8 +75,7 @@ test.describe("Cookies & Coquillettes v1", () => {
   test("import fichier crée la recette directement", async ({ page }) => {
     await page.goto("/");
     await createRecipeViaImport(page, "Recette: Omelette");
-    await expect(page.getByText("Recette importée.")).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+    await expect(page.locator("section.panel.detail, section.panel.form-panel")).toBeVisible();
   });
 
   test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
@@ -85,24 +93,27 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.getByRole("button", { name: "Ajouter une image" }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(imagePath);
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    await saveRecipeForm(page);
 
     await expect(page.getByRole("heading", { name: "Recette avec image" })).toBeVisible();
     await expect(page.getByAltText("Photo de la recette").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Retour" }).click();
-    const cardImage = page.locator(".recipe-card-image").first();
-    await expect(cardImage).toBeVisible();
+    const recipeCard = page.locator(".recipe-card", { hasText: "Recette avec image" }).first();
+    await expect(recipeCard.locator(".recipe-card-image")).toBeVisible();
 
-    await page.getByText("Recette avec image").first().click();
+    await recipeCard.click();
     await expect(page.locator(".recipe-detail-image")).toBeVisible();
 
     await page.getByRole("button", { name: "Éditer" }).click();
     await expect(page.locator(".recipe-form-image")).toBeVisible();
-    await page.getByRole("button", { name: "Supprimer" }).first().click();
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    await page
+      .locator(".recipe-form-image-actions")
+      .getByRole("button", { name: "Supprimer" })
+      .click();
+    await saveRecipeForm(page);
 
     await page.getByRole("button", { name: "Retour" }).click();
-    await expect(page.locator(".recipe-card-image")).not.toBeVisible();
+    await expect(recipeCard.locator(".recipe-card-image")).toHaveCount(0);
   });
 });

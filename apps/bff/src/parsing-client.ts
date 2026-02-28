@@ -156,6 +156,70 @@ interface SchemaRecipe {
   totalTime?: string;
 }
 
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: "\""
+};
+
+function decodeCodePoint(codePoint: number, fallback: string): string {
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+    return fallback;
+  }
+  try {
+    return String.fromCodePoint(codePoint);
+  } catch {
+    return fallback;
+  }
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (full, hex) =>
+      decodeCodePoint(Number.parseInt(hex, 16), full)
+    )
+    .replace(/&#(\d+);/g, (full, decimal) =>
+      decodeCodePoint(Number.parseInt(decimal, 10), full)
+    )
+    .replace(/&([a-z]+);/gi, (full, name) => HTML_ENTITY_MAP[name.toLowerCase()] ?? full);
+}
+
+function normalizeInstructionText(value: string): string {
+  return decodeHtmlEntities(value).replace(/\s+/g, " ").trim();
+}
+
+function extractInstructionTexts(rawInstruction: unknown): string[] {
+  if (typeof rawInstruction === "string") {
+    const normalized = normalizeInstructionText(rawInstruction);
+    return normalized ? [normalized] : [];
+  }
+  if (Array.isArray(rawInstruction)) {
+    return rawInstruction.flatMap((entry) => extractInstructionTexts(entry));
+  }
+  if (!rawInstruction || typeof rawInstruction !== "object") {
+    return [];
+  }
+
+  const instructionNode = rawInstruction as Record<string, unknown>;
+  const nestedInstructionEntries = [instructionNode.itemListElement, instructionNode.item]
+    .flatMap((entry) => extractInstructionTexts(entry));
+  if (nestedInstructionEntries.length > 0) {
+    return nestedInstructionEntries;
+  }
+
+  const directText = [instructionNode.text, instructionNode.name, instructionNode.description].find(
+    (candidate) => typeof candidate === "string"
+  ) as string | undefined;
+  if (!directText) {
+    return [];
+  }
+  const normalized = normalizeInstructionText(directText);
+  return normalized ? [normalized] : [];
+}
+
 function extractImageUrl(image: SchemaRecipe["image"]): string | undefined {
   if (!image) return undefined;
   if (typeof image === "string") return image;
@@ -197,30 +261,11 @@ function extractRecipeFromJsonLd(html: string, baseUrl: string): ParsedRecipeDra
           );
 
           const rawSteps = item.recipeInstructions;
-          let steps: { id: string; order: number; text: string }[] = [];
-          if (Array.isArray(rawSteps)) {
-            steps = rawSteps.map((s, idx) => {
-              const text =
-                typeof s === "string"
-                  ? s
-                  : s && typeof s === "object" && "text" in s
-                    ? String((s as { text?: string }).text ?? "")
-                    : JSON.stringify(s);
-              return {
-                id: `step-${idx}-${Date.now()}`,
-                order: idx + 1,
-                text: text.trim()
-              };
-            });
-          } else if (typeof rawSteps === "string") {
-            steps = [
-              {
-                id: `step-0-${Date.now()}`,
-                order: 1,
-                text: rawSteps.trim()
-              }
-            ];
-          }
+          const steps = extractInstructionTexts(rawSteps).map((text, idx) => ({
+            id: `step-${idx}-${Date.now()}`,
+            order: idx + 1,
+            text
+          }));
 
           const imageUrl = extractImageUrl(item.image);
           const resolvedImage =
