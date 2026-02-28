@@ -88,6 +88,12 @@ body {
   color: var(--p-primary-color, #1f4f46);
 }
 
+.recipe-card-meta {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #3e4b46;
+}
+
 .recipe-detail-header {
   position: relative;
   width: 100%;
@@ -231,15 +237,85 @@ body {
   min-width: 200px;
 }
 
+.filters-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.toolbar-search-row {
+  display: flex;
+}
+
+.toolbar-search-row .search-input {
+  max-width: 200px;
+  min-width: 120px;
+}
+
 .search-input {
   max-width: 200px;
   min-width: 120px;
+  border: 1px solid rgba(31, 79, 70, 0.2) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-input::placeholder {
+  color: #6b7280;
+}
+
+.search-input:focus {
+  border-color: rgba(31, 79, 70, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(31, 79, 70, 0.12);
 }
 
 .filter-chips {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+/* Mobile : icône loupe devant Favoris, champ recherche dépliable au-dessus des filtres */
+@media (max-width: 600px) {
+  .filters-inner {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .toolbar-search-row {
+    order: -1;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.2s ease, opacity 0.2s ease;
+  }
+
+  .toolbar-search-row.search-expanded {
+    max-height: 4rem;
+    opacity: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .toolbar-search-row .search-input {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .search-toggle-btn {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 601px) {
+  .search-toggle-btn {
+    display: none !important;
+  }
 }
 
 .toolbar-actions {

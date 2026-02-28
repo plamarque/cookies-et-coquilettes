@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
@@ -58,6 +58,16 @@ const feedback = ref<string>("");
 const errorMessage = ref<string>("");
 
 const search = ref("");
+const searchExpanded = ref(false);
+const searchInputRef = ref<HTMLInputElement | null>(null);
+
+function toggleSearchExpanded() {
+  const willExpand = !searchExpanded.value;
+  searchExpanded.value = willExpand;
+  if (willExpand) {
+    nextTick(() => searchInputRef.value?.focus());
+  }
+}
 const categoryFilter = ref<"ALL" | RecipeCategory>("ALL");
 const favoriteOnly = ref(false);
 
@@ -777,14 +787,27 @@ onMounted(async () => {
     <section v-if="viewMode === 'LIST'" class="list-view">
       <div class="toolbar">
         <div class="filters">
-          <input
-            id="search"
-            v-model="search"
-            type="search"
-            placeholder="Rechercher..."
-            class="search-input"
-          />
-          <div class="filter-chips">
+          <div class="filters-inner">
+            <div class="toolbar-search-row" :class="{ 'search-expanded': searchExpanded }">
+              <input
+                ref="searchInputRef"
+                id="search"
+                v-model="search"
+                type="search"
+                placeholder="Rechercher..."
+                class="search-input"
+              />
+            </div>
+            <div class="filter-chips">
+            <Button
+              class="search-toggle-btn"
+              icon="pi pi-search"
+              severity="secondary"
+              size="small"
+              rounded
+              aria-label="Rechercher"
+              @click="toggleSearchExpanded"
+            />
             <Button
               :severity="favoriteOnly ? 'primary' : 'secondary'"
               :label="`Favoris (${favoriteCount})`"
@@ -804,6 +827,7 @@ onMounted(async () => {
               size="small"
               @click="categoryFilter = categoryFilter === 'SALE' ? 'ALL' : 'SALE'"
             />
+            </div>
           </div>
         </div>
         <div class="toolbar-actions">
@@ -847,8 +871,7 @@ onMounted(async () => {
             {{ formatRecipeTime(recipe) }}
           </template>
           <template #content>
-            <p>{{ recipe.ingredients.length }} ingrédients</p>
-            <p>{{ recipe.steps.length }} étapes</p>
+            <p class="recipe-card-meta">{{ recipe.ingredients.length }} ingrédients · {{ recipe.steps.length }} étapes</p>
           </template>
         </Card>
 
