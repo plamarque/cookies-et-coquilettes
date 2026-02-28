@@ -179,6 +179,16 @@ body {
   border: 1px solid rgba(31, 79, 70, 0.2);
 }
 
+.recipe-form-image-row {
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.recipe-form-image-actions {
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .recipe-form-image-placeholder {
   display: flex;
   flex-direction: column;
@@ -301,18 +311,93 @@ body {
   justify-content: space-between;
 }
 
+.form-header-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.form-header-actions {
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.form-footer-actions {
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .checkbox-line {
   display: inline-flex;
   gap: 0.35rem;
   align-items: center;
 }
 
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1d1f1c;
+}
+
+.form-row-category-portions {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.form-row-portions-times {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.portions-input {
+  width: 6ch;
+  max-width: 6ch;
+}
+
+.form-row-prep-cook {
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+}
+
+.form-row-prep-cook .stack {
+  margin-bottom: 0;
+}
+
+.time-input {
+  width: 6ch;
+  max-width: 6ch;
+}
+
+.radio-line {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.category-radios {
+  gap: 1rem;
+}
+
 .ingredient-row {
   display: grid;
-  grid-template-columns: 2.2fr 0.7fr 0.8fr auto auto;
+  grid-template-columns: 8ch minmax(0, 1fr) 7ch auto;
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.ingredient-qty-input {
+  max-width: 8ch;
+}
+
+.ingredient-label-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ingredient-unit-input {
+  max-width: 7ch;
 }
 
 .step-row {
@@ -387,13 +472,14 @@ select {
   text-decoration: underline;
 }
 
-@media (max-width: 900px) {
-  .ingredient-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .ingredient-row .checkbox-line,
-  .ingredient-row button {
-    grid-column: span 1;
-  }
+.source-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+
+.source-input-row .source-input {
+  flex: 1;
+  min-width: 200px;
+}
+

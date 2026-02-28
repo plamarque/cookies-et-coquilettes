@@ -1006,11 +1006,19 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="viewMode === 'FORM'" class="panel form-panel">
-      <div class="row between">
+      <div class="row between form-header-row">
         <h2>
           {{ formMode === "EDIT" ? "Éditer recette" : "Nouvelle recette" }}
         </h2>
-        <Button label="Annuler" text icon="pi pi-times" @click="backToList" />
+        <div class="row form-header-actions">
+          <Button label="Annuler" text icon="pi pi-times" @click="backToList" />
+          <Button
+            label="Enregistrer"
+            icon="pi pi-check"
+            :disabled="!canSaveForm"
+            @click="saveForm"
+          />
+        </div>
       </div>
 
       <div class="stack">
@@ -1019,21 +1027,21 @@ onMounted(async () => {
       </div>
 
       <div class="stack">
-        <label for="source-url">URL de la recette originale</label>
-        <div class="row" style="gap: 0.5rem; align-items: center; flex-wrap: wrap">
+        <label for="source-url">Source</label>
+        <div class="row source-input-row">
           <input
             id="source-url"
             v-model="formSourceUrl"
             type="url"
             placeholder="https://..."
-            style="flex: 1; min-width: 200px"
+            class="source-input"
           />
           <Button
             v-if="form.source?.url"
             text
             size="small"
             icon="pi pi-refresh"
-            label="Réextraire la recette"
+            :aria-label="'Réextraire la recette'"
             :loading="imageReextracting"
             @click="triggerFullReextract"
           />
@@ -1041,8 +1049,7 @@ onMounted(async () => {
       </div>
 
       <div class="stack">
-        <label>Image</label>
-        <div v-if="form.imageUrl || (form.imageId && typeof form.imageId === 'string')" class="row" style="align-items: flex-start">
+        <div v-if="form.imageUrl || (form.imageId && typeof form.imageId === 'string')" class="row recipe-form-image-row">
           <RecipeImage
             v-if="form.imageId && typeof form.imageId === 'string'"
             :image-id="form.imageId"
@@ -1054,7 +1061,7 @@ onMounted(async () => {
             alt="Aperçu import"
             class="recipe-form-image"
           />
-          <div class="row" style="gap: 0.5rem; margin-left: 0.5rem">
+          <div class="row recipe-form-image-actions">
             <Button
               text
               size="small"
@@ -1110,61 +1117,59 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="row">
+      <div class="row form-row-category-portions">
         <div class="stack">
-          <label for="category">Catégorie</label>
-          <select id="category" v-model="form.category">
-            <option value="SUCRE">Sucré</option>
-            <option value="SALE">Salé</option>
-          </select>
-        </div>
-        <label class="checkbox-line">
-          <input v-model="form.favorite" type="checkbox" />
-          Favori
-        </label>
-      </div>
-
-      <div class="row">
-        <!-- Portions de base masqué (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED" -->
-        <div v-if="false" class="stack">
-          <label for="servingsBase">Portions de base</label>
-          <input id="servingsBase" v-model="form.servingsBase" type="number" min="1" step="1" />
+          <span class="form-label">Catégorie Sucré / Salé</span>
+          <div class="row category-radios">
+            <label class="radio-line">
+              <input v-model="form.category" type="radio" value="SUCRE" />
+              Sucré
+            </label>
+            <label class="radio-line">
+              <input v-model="form.category" type="radio" value="SALE" />
+              Salé
+            </label>
+          </div>
         </div>
         <div class="stack">
-          <label for="prepTime">Préparation (min)</label>
-          <input id="prepTime" v-model="form.prepTimeMin" type="number" min="1" step="1" />
+          <label for="servingsBase">Portions</label>
+          <input id="servingsBase" v-model="form.servingsBase" type="number" min="1" step="1" class="portions-input" />
         </div>
-        <div class="stack">
-          <label for="cookTime">Cuisson (min)</label>
-          <input id="cookTime" v-model="form.cookTimeMin" type="number" min="1" step="1" />
+        <div class="row form-row-prep-cook">
+          <div class="stack">
+            <label for="prepTime">Préparation (min)</label>
+            <input id="prepTime" v-model="form.prepTimeMin" type="number" min="1" step="1" class="time-input" />
+          </div>
+          <div class="stack">
+            <label for="cookTime">Cuisson (min)</label>
+            <input id="cookTime" v-model="form.cookTimeMin" type="number" min="1" step="1" class="time-input" />
+          </div>
         </div>
       </div>
 
       <h3>Ingrédients</h3>
       <div v-for="ingredient in form.ingredients" :key="ingredient.id" class="ingredient-row">
         <input
-          v-model="ingredient.label"
-          type="text"
-          placeholder="Nom ingrédient"
-          :aria-label="`ingredient-label-${ingredient.id}`"
-        />
-        <input
           v-model="ingredient.quantity"
           type="text"
           placeholder="Qté"
+          class="ingredient-qty-input"
           :aria-label="`ingredient-quantity-${ingredient.id}`"
+        />
+        <input
+          v-model="ingredient.label"
+          type="text"
+          placeholder="Nom ingrédient"
+          class="ingredient-label-input"
+          :aria-label="`ingredient-label-${ingredient.id}`"
         />
         <input
           v-model="ingredient.unit"
           type="text"
           placeholder="Unité"
+          class="ingredient-unit-input"
           :aria-label="`ingredient-unit-${ingredient.id}`"
         />
-        <!-- Scalable masqué (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED" -->
-        <label v-if="false" class="checkbox-line">
-          <input v-model="ingredient.isScalable" type="checkbox" />
-          Scalable
-        </label>
         <Button text icon="pi pi-trash" @click="removeIngredient(ingredient.id)" />
       </div>
       <Button text icon="pi pi-plus" label="Ajouter ingrédient" @click="addIngredient" />
@@ -1173,7 +1178,7 @@ onMounted(async () => {
       <div v-for="step in form.steps" :key="step.id" class="step-row">
         <textarea
           v-model="step.text"
-          rows="2"
+          rows="3"
           placeholder="Décris l'étape"
           :aria-label="`step-text-${step.id}`"
         />
@@ -1181,8 +1186,8 @@ onMounted(async () => {
       </div>
       <Button text icon="pi pi-plus" label="Ajouter étape" @click="addStep" />
 
-      <div class="row between">
-        <p class="muted">Règle v1: titre + au moins un ingrédient ou une étape.</p>
+      <div class="row form-footer-actions">
+        <Button label="Annuler" text icon="pi pi-times" @click="backToList" />
         <Button
           label="Enregistrer"
           icon="pi pi-check"
