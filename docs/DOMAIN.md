@@ -1,35 +1,96 @@
-# Modèle de domaine
+# Modèle de domaine v1
 
 ## Objectif
 
-Vocabulaire et concepts du domaine « cahier de recettes » pour Cookies & Coquillettes : recettes, ingrédients, étapes, organisation.
+Définir le vocabulaire métier et les règles de gestion pour la centralisation, la consultation et l’adaptation de recettes.
 
-## Termes clés
+## Valeurs et énumérations
 
-| Terme | Définition |
-|-------|------------|
-| **Recette** | Une préparation culinaire avec titre, ingrédients, étapes, durée et nombre de parts. |
-| **Ingrédient** | Un élément utilisé dans une recette, avec quantité (optionnelle) et unité (optionnelle). |
-| **Étape** | Une instruction de préparation, ordonnée dans la recette. |
-| **Catégorie** | Un regroupement de recettes (ex. dessert, entrée, plat principal). |
-| **Tag** | Mot-clé optionnel pour filtrer ou organiser les recettes. |
+- `RecipeCategory = SUCRE | SALE`
+- `ImportType = MANUAL | SHARE | URL | SCREENSHOT | TEXT`
 
-## Entités et relations
+## Entités
 
-- **Recette :** titre, liste d’ingrédients, liste d’étapes, durée (en minutes), nombre de parts, catégorie(s), tags, date de création/modification.
-- **Ingrédient :** nom, quantité (nombre ou texte), unité (g, ml, cuillère, etc.).
-- **Étape :** ordre, texte descriptif.
-- **Catégorie :** nom, éventuellement hiérarchie. [ASSUMPTION] Une recette peut avoir une ou plusieurs catégories.
-- **Relation :** Une recette contient N ingrédients et N étapes ; une recette appartient à une ou plusieurs catégories ; une recette peut avoir N tags.
+### Recipe
+
+Recette utilisateur persistée localement.
+
+Attributs principaux :
+- `id`
+- `title`
+- `category`
+- `favorite`
+- `servingsBase` (optionnel)
+- `servingsCurrent` (optionnel)
+- `ingredients: IngredientLine[]`
+- `steps: InstructionStep[]`
+- `prepTimeMin` (optionnel)
+- `cookTimeMin` (optionnel)
+- `imageId` (optionnel)
+- `source: ImportSource` (optionnel)
+- `createdAt`
+- `updatedAt`
+
+### IngredientLine
+
+Ligne d’ingrédient affichée et exploitable pour le recalcul des portions.
+
+Attributs principaux :
+- `id`
+- `label` (nom lisible)
+- `quantity` (optionnelle)
+- `unit` (optionnelle)
+- `isScalable` (booléen)
+- `rawText` (optionnel, garde la forme source)
+
+### InstructionStep
+
+Étape ordonnée de préparation.
+
+Attributs :
+- `id`
+- `order`
+- `text`
+
+### RecipeImage
+
+Image de recette associée à une vignette et/ou à un détail.
+
+Attributs :
+- `id`
+- `mimeType`
+- `width`
+- `height`
+- `sizeBytes`
+- `createdAt`
+
+### ImportSource
+
+Trace de provenance d’une recette importée.
+
+Attributs :
+- `type: ImportType`
+- `url` (optionnel)
+- `capturedAt`
+
+## Relations
+
+1. Une `Recipe` contient `N` `IngredientLine`.
+2. Une `Recipe` contient `N` `InstructionStep`.
+3. Une `Recipe` peut référencer `0..1` `RecipeImage`.
+4. Une `Recipe` peut référencer `0..1` `ImportSource`.
 
 ## Règles du domaine
 
-1. Une recette a au moins un titre.
-2. Les étapes sont ordonnées (numérotation ou ordre explicite).
-3. Les ingrédients peuvent être sans quantité ni unité (texte libre).
-4. [ASSUMPTION] Les catégories sont prédéfinies ou créées par l’utilisateur — à préciser.
-
-## Hypothèses et incertitudes
-
-- [UNCERTAIN] Gestion des unités : liste fixe ou saisie libre.
-- [UNCERTAIN] Adaptation des quantités (ex. recette pour 4 parts, affichage pour 6) — hors scope v1 ou à inclure.
+1. Une recette doit contenir un `title`.
+2. Une recette doit contenir au moins un ingrédient ou au moins une étape.
+3. Les étapes sont ordonnées strictement par `order`.
+4. Les ingrédients non quantifiables sont conservés en texte libre (`rawText`/`label`) et peuvent être marqués `isScalable = false`.
+5. Le recalcul des portions utilise un coefficient linéaire :
+   - `coefficient = servingsTarget / servingsReference`.
+6. Les arrondis doivent rester culinaires et lisibles :
+   - unités “œuf/oeuf/pièce/unité” arrondies à l’entier,
+   - grammes/ml arrondis raisonnablement,
+   - unités non numériques inchangées.
+7. L’utilisateur peut revenir aux quantités de base via reset des portions.
+8. “Sans changer les grammages” signifie : pas de transformation implicite de la recette importée sans action explicite.

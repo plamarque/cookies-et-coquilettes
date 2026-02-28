@@ -21,3 +21,4 @@ Ce document décrit quand mettre à jour quel document du workflow de gouvernanc
 1. **Normatifs (SPEC, DOMAIN, ARCH, WORKFLOW, ADR)** : définissent le comportement et la structure attendus. Les modifier quand le contrat ou l’architecture change.
 2. **Suivi (PLAN, ISSUES)** : rester factuels ; ne pas inventer de tâches ou de bugs.
 3. **Opérationnel (DEVELOPMENT)** : refléter les commandes et procédures réelles.
+4. **Discovery produit** : toute décision issue d’interview utilisateur doit d’abord être répercutée dans SPEC/DOMAIN/ARCH (et ADR si technique) avant l’implémentation code.

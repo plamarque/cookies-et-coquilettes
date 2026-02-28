@@ -1,49 +1,102 @@
-# Architecture
+# Architecture v1
 
 ## Objectif
 
-Structure technique cible de Cookies & Coquillettes, application mobile de cahier de recettes.
+Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScript avec stockage local et BFF léger pour OCR/parsing cloud.
 
 ## Vue d’ensemble
 
-Application mobile (native ou hybride) avec stockage local. Pas de backend en v1. Architecture en couches : UI, logique métier, persistance.
+```text
+[PWA Vue UI] <-> [Services métier front] <-> [IndexedDB/Dexie]
+       |
+       +---- HTTP ----> [BFF Node/TS] ----> [Cloud OCR + Parsing]
+```
 
-```
-[UI / écrans] ←→ [Logique / services] ←→ [Persistance locale]
-```
+## Stack retenue
+
+- Frontend : Vue 3 + TypeScript + Vite
+- UI : PrimeVue + thème custom sobre/moderne
+- PWA : `vite-plugin-pwa` (installable, manifest, share target)
+- Persistance locale : IndexedDB via Dexie
+- Backend léger : Node.js + TypeScript (BFF)
+- Runtime : offline-first côté consultation/édition locale
 
 ## Composants
 
-| Composant | Responsabilité | Technologie / emplacement |
-|-----------|---------------|---------------------------|
-| **Écrans** | Affichage, navigation, saisie | [ASSUMPTION] React Native / Expo ou Flutter — à décider (voir ADR). |
-| **Services / logique** | CRUD recettes, recherche, filtrage | Modules applicatifs. |
-| **Persistance** | Stockage des recettes | [ASSUMPTION] SQLite ou stockage clé-valeur local (AsyncStorage, Hive, etc.). |
-| **Navigation** | Routage entre écrans | Stack / tab navigation selon le framework. |
+| Composant | Responsabilité | Emplacement |
+|-----------|----------------|-------------|
+| `app-shell` | Initialisation Vue/PWA/PrimeVue | `apps/web/src/main.ts` |
+| `recipe-service` | CRUD recettes, favoris, portions | `apps/web/src/services/recipe-service.ts` |
+| `import-service` | Import URL/share/screenshot/texte + appel BFF | `apps/web/src/services/import-service.ts` |
+| `cooking-mode-service` | Wake Lock + fallback navigateur | `apps/web/src/services/cooking-mode-service.ts` |
+| `db` | Schéma IndexedDB et accès tables | `apps/web/src/storage/db.ts` |
+| `import-api` | Endpoints BFF pour OCR/parsing | `apps/bff/src` |
+| `domain-types` | Types métier partagés | `packages/domain/src` |
 
-## Stack technique
+## Contrats de services (normatifs)
 
-- **Framework mobile :** [UNCERTAIN] React Native (Expo), Flutter ou autre — décision à documenter dans ADR.
-- **Langage :** TypeScript (RN) ou Dart (Flutter).
-- **Persistance :** Base locale (SQLite, AsyncStorage, ou équivalent).
-- **Build :** Outils du framework choisi (Expo, Flutter CLI).
+### Recipe service
 
-## Modèle d’exécution
+- `createRecipe(recipe)`
+- `updateRecipe(recipeId, patch)`
+- `toggleFavorite(recipeId, favorite?)`
+- `listRecipes(filters?)`
+- `scaleRecipe(recipeId, servings)`
 
-- Application installée sur l’appareil.
-- Données stockées localement ; pas de serveur requis en v1.
-- [ASSUMPTION] Fonctionne hors-ligne pour la consultation et l’édition des recettes.
+### Import service
 
-## Fichiers et répertoires clés (cible)
+- `importFromUrl(url)`
+- `importFromShare(payload)`
+- `importFromScreenshot(file)`
+- `importFromText(text)`
 
-- `src/` ou `lib/` : code source (selon framework).
-- `src/screens/` : écrans (liste, détail, formulaire).
-- `src/services/` : logique métier (recettes, recherche).
-- `src/storage/` : couche de persistance.
-- `docs/` : documentation du projet.
+### Cooking mode service
 
-## Hypothèses et incertitudes
+- `startCookingMode()`
+- `stopCookingMode()`
 
-- [ASSUMPTION] Choix du framework mobile à valider ; impact sur la structure des dossiers.
-- [UNCERTAIN] Stratégie de migration des données si le schéma évolue.
-- [UNCERTAIN] Cible : iOS, Android ou les deux en priorité.
+## Données et persistance
+
+### IndexedDB
+
+Tables minimales :
+- `recipes`
+- `images`
+
+Index minimaux :
+- `category`
+- `favorite`
+- `updatedAt`
+
+### Règles de persistance
+
+1. Écriture locale immédiate après création/édition.
+2. Données disponibles hors-ligne pour lecture et édition.
+3. Images compressées à l’import avant stockage local.
+
+## Import et parsing
+
+1. Les données brutes (URL, texte, screenshot, payload de partage) sont normalisées côté front.
+2. L’extraction OCR/parsing est déléguée au BFF.
+3. Le BFF protège les clés cloud et renvoie un draft éditable.
+4. En cas d’échec partiel, la correction manuelle est obligatoire côté UI.
+
+## Compatibilité et dégradation progressive
+
+1. Wake Lock :
+   - utiliser `navigator.wakeLock` si disponible,
+   - fallback visuel/instructionnel sinon.
+2. Share Target :
+   - activer dans le manifest PWA,
+   - conserver une entrée manuelle URL/texte/screenshot pour tous les navigateurs.
+
+## Arborescence cible
+
+```text
+apps/
+  web/        # PWA Vue/TS
+  bff/        # API Node/TS pour OCR/parsing
+packages/
+  domain/     # types et contrats partagés
+docs/
+```

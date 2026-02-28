@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cookies-et-coquilettes-bff
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm ci && npm run build:bff
+    startCommand: npm run start -w @cookies-et-coquilettes/bff
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

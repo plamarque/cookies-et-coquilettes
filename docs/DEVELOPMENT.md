@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-- [ASSUMPTION] Node 18+ (si React Native / Expo) ou Flutter SDK (si Flutter) — à préciser après choix du framework.
+- Node 20+
 - Git
 
 ## Configuration
@@ -10,14 +10,58 @@
 ```bash
 git clone <repo>
 cd cookies-et-coquilettes
-# À compléter selon le framework choisi :
-# npm install   # ou pnpm install
-# ou flutter pub get
+npm install
 ```
 
 ## Commandes
 
-À définir après initialisation du projet (ex. `npm run dev`, `expo start`, `flutter run`).
+```bash
+# Dev complet (web + bff)
+npm run dev
+
+# PWA Vue
+npm run dev:web
+
+# BFF OCR/parsing
+npm run dev:bff
+
+# Build
+npm run build:web
+npm run build:bff
+
+# Vérifications TypeScript
+npm run typecheck
+
+# E2E Playwright
+npm run test:e2e
+npm run test:e2e:ui
+
+# Génération screenshots stores
+npm run screenshots
+```
+
+Le front est servi par défaut sur `http://localhost:5173` et le BFF sur `http://localhost:8787`.
+
+## Variables d’environnement
+
+Copier `.env.example` vers `.env` pour le local puis adapter les valeurs.
+
+- Front : `VITE_BFF_URL`, `VITE_BASE_PATH`
+- BFF : `OPENAI_API_KEY`, `CORS_ORIGIN`
+
+## Prérequis E2E / screenshots
+
+```bash
+npm install -D @playwright/test
+npx playwright install chromium
+```
+
+## Déploiement
+
+- PWA : workflow GitHub Pages (`.github/workflows/deploy-pages.yml`)
+- BFF : workflow Render (`.github/workflows/deploy-render.yml`) + `render.yaml`
+- Détails pas-à-pas : `docs/DEPLOYMENT.md`
+- Publication stores : `docs/PUBLISHING_STORES.md`
 
 ## Contribution
 
