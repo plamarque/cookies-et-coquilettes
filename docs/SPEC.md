@@ -17,12 +17,15 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
    - capture d’écran,
    - texte collé.
 3. Structuration lisible de la recette importée sans altérer arbitrairement le sens de la source.
-4. Classement binaire des recettes : `Sucré` / `Salé`.
+4. Classement binaire des recettes : `Sucré` / `Salé` (sans tags en v1).
 5. Mise en favoris.
 6. Consultation via vignettes (photo + nom), détail lisible, et édition libre à tout moment.
 7. Ajustement du nombre de portions avec recalcul automatique des quantités.
 8. Mode cuisine anti-veille (Wake Lock si disponible, sinon fallback non bloquant).
 9. Fonctionnement local sans compte utilisateur (stockage local-only).
+10. Suppression définitive d’une recette avec confirmation explicite.
+11. Sauvegarde explicite du formulaire recette (`Enregistrer` / `Annuler`).
+12. Flux d’import avec revue obligatoire avant création finale.
 
 ### Hors périmètre v1
 
@@ -38,13 +41,16 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 
 1. L’utilisateur peut saisir une recette entièrement à la main.
 2. L’utilisateur peut importer une recette via partage/URL/screenshot/texte.
-3. Si l’extraction automatique échoue partiellement, l’utilisateur peut corriger manuellement.
+3. Toute recette importée passe par un écran de revue/édition avant création définitive.
+4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement.
 
 ### Organisation et recherche rapide
 
 1. Les recettes sont affichées sous forme de grille de vignettes.
 2. L’utilisateur peut filtrer par catégorie (`Sucré`, `Salé`) et par favoris.
-3. La navigation privilégie l’accès rapide aux recettes fréquemment utilisées.
+3. L’utilisateur peut rechercher en texte libre sur `titre + ingrédients`.
+4. La liste est triée par défaut par dernière modification (`updatedAt DESC`).
+5. La navigation privilégie l’accès rapide aux recettes fréquemment utilisées.
 
 ### Consultation et exécution
 
@@ -56,7 +62,8 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 ### Édition
 
 1. Toute recette peut être modifiée à tout moment.
-2. Les modifications sont persistées localement immédiatement.
+2. Les modifications sont persistées localement à l’action explicite de sauvegarde.
+3. La suppression est irréversible après confirmation utilisateur.
 
 ## Critères de succès v1
 
@@ -64,9 +71,12 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 2. Retrouver une recette en moins de 10 secondes via vignettes + filtres (`Sucré`, `Salé`, `Favoris`).
 3. Changer le nombre de portions et observer la mise à jour des quantités sans latence perceptible.
 4. Consulter et modifier les recettes sans connexion réseau.
+5. Finaliser un import en passant par une revue éditable, y compris en mode fallback hors-ligne.
 
 ## Contraintes fonctionnelles
 
 1. Le recalcul des portions ne s’exécute que sur action explicite utilisateur.
 2. Les quantités non quantifiables (ex : “une pincée”, “un zeste”) restent en texte libre.
 3. Les unités pratiques doivent être conservées quand possible (ex : œufs en nombre, pas en grammes).
+4. Le recalcul des portions doit se baser sur une référence immuable (pas de dérive cumulative).
+5. Le produit est optimisé pour le français en v1 ; autres langues en best effort.

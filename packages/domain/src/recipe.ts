@@ -5,6 +5,7 @@ export interface IngredientLine {
   id: string;
   label: string;
   quantity?: number;
+  quantityBase?: number;
   unit?: string;
   isScalable: boolean;
   rawText?: string;
@@ -57,6 +58,7 @@ export interface RecipeFilters {
 export interface RecipeService {
   createRecipe(recipe: Recipe): Promise<void>;
   updateRecipe(recipeId: string, patch: Partial<Recipe>): Promise<void>;
+  deleteRecipe(recipeId: string): Promise<void>;
   toggleFavorite(recipeId: string, favorite?: boolean): Promise<void>;
   listRecipes(filters?: RecipeFilters): Promise<Recipe[]>;
   scaleRecipe(recipeId: string, servings: number): Promise<Recipe>;

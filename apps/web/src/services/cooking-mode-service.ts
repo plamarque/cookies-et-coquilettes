@@ -20,9 +20,14 @@ class BrowserCookingModeService implements CookingModeService {
   async startCookingMode(): Promise<CookingModeSession> {
     const wakeNavigator = navigator as NavigatorWithWakeLock;
     if (wakeNavigator.wakeLock?.request) {
-      this.wakeLockSentinel = await wakeNavigator.wakeLock.request("screen");
-      this.fallbackActive = false;
-      return { active: true, strategy: "WAKE_LOCK" };
+      try {
+        this.wakeLockSentinel = await wakeNavigator.wakeLock.request("screen");
+        this.fallbackActive = false;
+        return { active: true, strategy: "WAKE_LOCK" };
+      } catch (_error) {
+        this.fallbackActive = true;
+        return { active: true, strategy: "FALLBACK" };
+      }
     }
 
     this.fallbackActive = true;

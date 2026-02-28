@@ -2,32 +2,22 @@
 
 ## Phase actuelle
 
-Tranche 2 (modèle de données et persistance) prête à démarrer.
+Exécution des slices v1 en petites livraisons verticales.
 
-## Tranches
+## Slices v1
 
-| Tranche | Objectif | Statut |
-|---------|----------|--------|
-| 0 | Gouvernance documentaire | Fait |
-| 1 | Choix du framework et structure de base | Fait |
-| 2 | Modèle de données et persistance | En cours |
-| 3 | Écrans CRUD recettes (liste, détail, formulaire) | À faire |
-| 4 | Recherche et filtrage | À faire |
-| 5 | Organisation (catégories, tags) | À faire |
+| Slice | Objectif | Statut |
+|-------|----------|--------|
+| A | Invariants domaine + types partagés (`quantityBase`, validation, règles import/suppression) | En cours |
+| B | Persistance Dexie + `recipe-service` (CRUD/favoris/scale immuable/tri) | En cours |
+| C | CRUD UI (liste, détail, formulaire) avec sauvegarde explicite | En cours |
+| D | Recherche et filtres (`Sucré/Salé`, favoris, texte titre+ingrédients) | En cours |
+| E | Import complet + revue obligatoire + fallback draft manuel | En cours |
+| F | Mode cuisine Wake Lock + fallback non bloquant | En cours |
+| G | Durcissement release v1 (tests smoke E2E + cohérence erreurs/docs) | En cours |
 
-## Tâches (Tranche 1)
+## Definition of Done par slice
 
-- [x] Décision framework : PWA Vue + TypeScript (ADR 0001)
-- [x] Initialisation du projet
-- [x] Structure des dossiers de base
-- [x] Configuration de développement
-
-## Tâches (Tranche 2)
-
-- [x] Types domaine partagés (`Recipe`, `IngredientLine`, `InstructionStep`, etc.)
-- [x] Contrats de services (`recipe-service`, `import-service`, `cooking-mode-service`)
-- [x] Base locale IndexedDB via Dexie (squelette)
-- [x] Pipeline de déploiement push-based (GitHub Pages + Render)
-- [x] Scripts utilitaires de base (`start-dev.sh`, E2E, screenshots stores)
-- [x] Documentation publication stores (setup consoles)
-- [ ] Implémentation complète CRUD + filtres + écrans
+- [x] Code implémenté
+- [x] Tests unitaires et/ou smoke E2E ciblés
+- [x] Docs normatives et de suivi alignées

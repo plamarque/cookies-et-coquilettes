@@ -1,10 +1,12 @@
 import type {
   ImportService,
+  ImportType,
   ParsedRecipeDraft,
   ShareImportPayload
 } from "@cookies-et-coquilettes/domain";
 
 const API_BASE_URL = import.meta.env.VITE_BFF_URL || "http://localhost:8787";
+const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
 async function parseResponse(response: Response): Promise<ParsedRecipeDraft> {
   if (!response.ok) {
@@ -13,43 +15,124 @@ async function parseResponse(response: Response): Promise<ParsedRecipeDraft> {
   return (await response.json()) as ParsedRecipeDraft;
 }
 
+function fallbackDraft(type: ImportType, seed?: string): ParsedRecipeDraft {
+  const title = seed?.trim() ? seed.trim() : "Recette importée";
+  return {
+    title,
+    category: "SALE",
+    ingredients: [],
+    steps: [],
+    source: {
+      type,
+      capturedAt: new Date().toISOString()
+    }
+  };
+}
+
+async function compressScreenshot(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSize = 1600;
+    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return file;
+    }
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.82)
+    );
+    if (!blob) {
+      return file;
+    }
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+      type: "image/jpeg"
+    });
+  } catch (_error) {
+    return file;
+  }
+}
+
 class BffImportService implements ImportService {
   async importFromUrl(url: string): Promise<ParsedRecipeDraft> {
-    const response = await fetch(`${API_BASE_URL}/api/import/url`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url })
-    });
-    return parseResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/import/url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      return await parseResponse(response);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("importFromUrl fallback draft", error);
+      return fallbackDraft("URL", "Recette depuis URL");
+    }
   }
 
   async importFromShare(payload: ShareImportPayload): Promise<ParsedRecipeDraft> {
-    const response = await fetch(`${API_BASE_URL}/api/import/share`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    return parseResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/import/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return await parseResponse(response);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("importFromShare fallback draft", error);
+      return fallbackDraft("SHARE", payload.title);
+    }
   }
 
   async importFromScreenshot(file: File): Promise<ParsedRecipeDraft> {
-    const body = new FormData();
-    body.append("file", file);
+    try {
+      const compressed = await compressScreenshot(file);
+      if (compressed.size > MAX_SCREENSHOT_BYTES) {
+        throw new Error("Image trop volumineuse (max 5 Mo).");
+      }
 
-    const response = await fetch(`${API_BASE_URL}/api/import/screenshot`, {
-      method: "POST",
-      body
-    });
-    return parseResponse(response);
+      const body = new FormData();
+      body.append("file", compressed);
+
+      const response = await fetch(`${API_BASE_URL}/api/import/screenshot`, {
+        method: "POST",
+        body
+      });
+      return await parseResponse(response);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("importFromScreenshot fallback draft", error);
+      return fallbackDraft("SCREENSHOT", file.name.replace(/\.[^.]+$/, ""));
+    }
   }
 
   async importFromText(text: string): Promise<ParsedRecipeDraft> {
-    const response = await fetch(`${API_BASE_URL}/api/import/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-    return parseResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/import/text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      return await parseResponse(response);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("importFromText fallback draft", error);
+      return fallbackDraft("TEXT", "Recette depuis texte");
+    }
   }
 }
 

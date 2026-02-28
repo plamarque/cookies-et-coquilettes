@@ -39,9 +39,15 @@ Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScr
 
 - `createRecipe(recipe)`
 - `updateRecipe(recipeId, patch)`
+- `deleteRecipe(recipeId)`
 - `toggleFavorite(recipeId, favorite?)`
 - `listRecipes(filters?)`
 - `scaleRecipe(recipeId, servings)`
+
+Règles de contrat :
+- validation à la sauvegarde (`title` + au moins un ingrédient ou une étape),
+- recalcul portions depuis `quantityBase` (immuable),
+- tri par défaut `updatedAt DESC`.
 
 ### Import service
 
@@ -49,6 +55,10 @@ Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScr
 - `importFromShare(payload)`
 - `importFromScreenshot(file)`
 - `importFromText(text)`
+
+Règles de contrat :
+- flux en 2 étapes obligatoire : `parse -> draft review -> create`,
+- en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
 
 ### Cooking mode service
 
@@ -79,7 +89,14 @@ Index minimaux :
 1. Les données brutes (URL, texte, screenshot, payload de partage) sont normalisées côté front.
 2. L’extraction OCR/parsing est déléguée au BFF.
 3. Le BFF protège les clés cloud et renvoie un draft éditable.
-4. En cas d’échec partiel, la correction manuelle est obligatoire côté UI.
+4. Le front impose une revue utilisateur avant création de recette.
+5. En cas d’échec partiel ou BFF indisponible, le front et/ou le BFF renvoient un draft fallback minimal.
+
+## Gestion d'erreurs v1
+
+1. Messages utilisateur explicites côté UI.
+2. Logs console front et BFF pour diagnostic local.
+3. Pas de plateforme externe de suivi d’erreurs en v1.
 
 ## Compatibilité et dégradation progressive
 

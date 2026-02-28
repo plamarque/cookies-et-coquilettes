@@ -38,7 +38,8 @@ Ligne d’ingrédient affichée et exploitable pour le recalcul des portions.
 Attributs principaux :
 - `id`
 - `label` (nom lisible)
-- `quantity` (optionnelle)
+- `quantity` (optionnelle, valeur affichée courante)
+- `quantityBase` (optionnelle, référence immuable pour scaling)
 - `unit` (optionnelle)
 - `isScalable` (booléen)
 - `rawText` (optionnel, garde la forme source)
@@ -87,10 +88,13 @@ Attributs :
 3. Les étapes sont ordonnées strictement par `order`.
 4. Les ingrédients non quantifiables sont conservés en texte libre (`rawText`/`label`) et peuvent être marqués `isScalable = false`.
 5. Le recalcul des portions utilise un coefficient linéaire :
-   - `coefficient = servingsTarget / servingsReference`.
+   - `coefficient = servingsTarget / servingsBase`.
+   - la quantité recalculée doit toujours dériver de `quantityBase` si présent.
 6. Les arrondis doivent rester culinaires et lisibles :
    - unités “œuf/oeuf/pièce/unité” arrondies à l’entier,
    - grammes/ml arrondis raisonnablement,
    - unités non numériques inchangées.
 7. L’utilisateur peut revenir aux quantités de base via reset des portions.
 8. “Sans changer les grammages” signifie : pas de transformation implicite de la recette importée sans action explicite.
+9. Suppression d’une recette : définitive après confirmation utilisateur.
+10. Import fallback : en cas d’échec parsing/BFF, un draft minimal éditable est créé avec `source`.

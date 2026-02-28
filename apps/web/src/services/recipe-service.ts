@@ -3,6 +3,11 @@ import type {
   RecipeFilters,
   RecipeService
 } from "@cookies-et-coquilettes/domain";
+import {
+  assertRecipeValidForSave,
+  normalizeRecipeForSave,
+  scaleIngredientsFromBase
+} from "@cookies-et-coquilettes/domain";
 import { db } from "../storage/db";
 
 function bySearch(recipe: Recipe, search?: string): boolean {
@@ -19,30 +24,11 @@ function bySearch(recipe: Recipe, search?: string): boolean {
   );
 }
 
-function smartRound(quantity: number, unit?: string): number {
-  const normalizedUnit = unit?.toLowerCase() ?? "";
-  const isIntegerUnit =
-    normalizedUnit.includes("oeuf") ||
-    normalizedUnit.includes("œuf") ||
-    normalizedUnit.includes("pièce") ||
-    normalizedUnit.includes("piece") ||
-    normalizedUnit.includes("unité") ||
-    normalizedUnit.includes("unite");
-
-  if (isIntegerUnit) {
-    return Math.max(1, Math.round(quantity));
-  }
-
-  if (quantity >= 100) {
-    return Math.round(quantity);
-  }
-
-  return Math.round(quantity * 10) / 10;
-}
-
 class DexieRecipeService implements RecipeService {
   async createRecipe(recipe: Recipe): Promise<void> {
-    await db.recipes.put(recipe);
+    const normalized = normalizeRecipeForSave(recipe);
+    assertRecipeValidForSave(normalized);
+    await db.recipes.put(normalized);
   }
 
   async updateRecipe(recipeId: string, patch: Partial<Recipe>): Promise<void> {
@@ -51,11 +37,25 @@ class DexieRecipeService implements RecipeService {
       throw new Error(`Recipe not found: ${recipeId}`);
     }
 
-    await db.recipes.put({
+    const updated = normalizeRecipeForSave({
       ...current,
       ...patch,
       updatedAt: new Date().toISOString()
     });
+    assertRecipeValidForSave(updated);
+    await db.recipes.put(updated);
+  }
+
+  async deleteRecipe(recipeId: string): Promise<void> {
+    const current = await db.recipes.get(recipeId);
+    if (!current) {
+      return;
+    }
+
+    await db.recipes.delete(recipeId);
+    if (current.imageId) {
+      await db.images.delete(current.imageId);
+    }
   }
 
   async toggleFavorite(recipeId: string, favorite?: boolean): Promise<void> {
@@ -94,26 +94,19 @@ class DexieRecipeService implements RecipeService {
       throw new Error(`Recipe not found: ${recipeId}`);
     }
 
-    const referenceServings = current.servingsCurrent ?? current.servingsBase;
+    const referenceServings = current.servingsBase;
     if (!referenceServings || referenceServings <= 0) {
       throw new Error("Recipe has no valid servings reference");
     }
 
-    const coefficient = servings / referenceServings;
-
     const updated: Recipe = {
       ...current,
       servingsCurrent: servings,
-      ingredients: current.ingredients.map((ingredient) => {
-        if (!ingredient.isScalable || ingredient.quantity === undefined) {
-          return ingredient;
-        }
-
-        return {
-          ...ingredient,
-          quantity: smartRound(ingredient.quantity * coefficient, ingredient.unit)
-        };
-      }),
+      ingredients: scaleIngredientsFromBase(
+        current.ingredients,
+        servings,
+        referenceServings
+      ),
       updatedAt: new Date().toISOString()
     };
 
