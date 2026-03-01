@@ -77,7 +77,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 2. Si l'image n'existe pas, elle est générée automatiquement par IA à la demande (lazy).
 3. Si l'image existe déjà (stockée localement), elle est réutilisée.
 4. Sur les cartes de la page d'accueil (liste des recettes), où le nombre total d'ingrédients est affiché, les images des ingrédients sont affichées en petits icônes sur le côté.
-5. Style des images : photoréaliste, esthétique « atelier de cuisine », conçu pour être lisible en petit format.
+5. Style des images : photoréaliste, ingrédient unique en gros plan (une seule occurrence), fond blanc propre sans ombre marquée, conçu pour rester lisible en petit format.
 
 ### Édition
 
