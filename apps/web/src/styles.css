@@ -240,38 +240,75 @@ body {
   white-space: nowrap;
 }
 
-.cooking-steps-slider {
+.cooking-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  margin-top: 0.4rem;
-  padding: 0.9rem;
-  border: 1px solid rgba(31, 79, 70, 0.18);
-  border-radius: 0.85rem;
-  background: rgba(31, 79, 70, 0.04);
+  overflow-y: auto;
+  padding:
+    calc(0.95rem + env(safe-area-inset-top))
+    1rem
+    calc(1rem + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #f8f4ec 0%, #f3ece0 100%);
   touch-action: pan-y;
 }
 
-.cooking-steps-media-image {
-  width: 100%;
-  max-height: 220px;
-  object-fit: cover;
-  display: block;
-  border-radius: 0.65rem;
+.cooking-fullscreen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.cooking-steps-media-placeholder {
+.cooking-fullscreen-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.cooking-fullscreen-title {
+  margin: 0;
+  font-size: clamp(1.05rem, 4.2vw, 1.45rem);
+  line-height: 1.25;
+  font-weight: 700;
+  color: #1d1f1c;
+}
+
+.cooking-fullscreen-close.p-button {
+  width: 2.4rem;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.cooking-fullscreen-media-image {
+  width: 100%;
+  min-height: 170px;
+  max-height: 34vh;
+  object-fit: cover;
+  display: block;
+  border-radius: 0.85rem;
+}
+
+.cooking-fullscreen-media-placeholder {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.75rem;
-  border: 1px dashed rgba(31, 79, 70, 0.3);
-  border-radius: 0.65rem;
+  padding: 0.8rem;
+  border: 1px dashed rgba(31, 79, 70, 0.32);
+  border-radius: 0.8rem;
   background: rgba(255, 255, 255, 0.86);
 }
 
-.cooking-steps-media-placeholder p {
+.cooking-fullscreen-media-placeholder p {
   margin: 0;
   color: #3e4b46;
   font-size: 0.9rem;
@@ -280,47 +317,98 @@ body {
 .cooking-step-status {
   margin: 0;
   color: #2f3f39;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.cooking-step-ingredients {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.cooking-step-ingredients h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #2f3f39;
+}
+
+.cooking-step-ingredients-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cooking-step-ingredients-list li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(31, 79, 70, 0.08);
   font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
+}
+
+.cooking-step-ingredients-empty {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #3e4b46;
+  font-size: 0.9rem;
 }
 
 .cooking-step-text {
   margin: 0;
-  padding: 1rem;
-  border: 1px solid rgba(31, 79, 70, 0.15);
-  border-radius: 0.65rem;
-  background: #fff;
-  font-size: 1.15rem;
-  line-height: 1.6;
   white-space: pre-line;
 }
 
+.cooking-step-text--fullscreen {
+  padding: 1.2rem 1.15rem;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  border-radius: 0.9rem;
+  background: #fff;
+  font-size: clamp(1.45rem, 5.8vw, 2.35rem);
+  line-height: 1.5;
+  font-weight: 600;
+}
+
 .cooking-step-hint {
-  margin: -0.2rem 0 0;
+  margin: -0.1rem 0 0;
   color: #3e4b46;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .cooking-step-navigation {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .cooking-step-nav.p-button {
+  flex: 1;
+  min-height: 3rem;
   border-radius: 999px !important;
+  font-size: 1rem !important;
 }
 
 .cooking-step-dots {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .cooking-step-dot {
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 0.82rem;
+  height: 0.82rem;
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -330,13 +418,21 @@ body {
 
 .cooking-step-dot--active {
   background: var(--p-primary-color, #1f4f46);
-  transform: scale(1.08);
+  transform: scale(1.12);
 }
 
 .cooking-ingredients-toggle-row {
   display: flex;
-  justify-content: flex-start;
-  margin-top: 0.5rem;
+  justify-content: center;
+}
+
+.cooking-fullscreen-all-ingredients {
+  margin: 0;
+  padding: 0 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.98rem;
 }
 
 .recipe-form-image {
@@ -504,24 +600,38 @@ body {
     justify-content: center;
   }
 
-  .cooking-steps-slider {
-    padding: 0.75rem;
-    border-radius: 0.75rem;
+  .cooking-fullscreen-overlay {
+    gap: 0.75rem;
+    padding:
+      calc(0.75rem + env(safe-area-inset-top))
+      0.75rem
+      calc(0.9rem + env(safe-area-inset-bottom));
   }
 
-  .cooking-step-text {
-    padding: 0.9rem;
-    font-size: 1.12rem;
-    line-height: 1.65;
+  .cooking-fullscreen-media-image {
+    max-height: 31vh;
+    min-height: 145px;
+  }
+
+  .cooking-step-text--fullscreen {
+    padding: 1rem;
+    font-size: clamp(1.45rem, 7vw, 2rem);
+    line-height: 1.52;
   }
 
   .cooking-step-hint {
     font-size: 0.8rem;
   }
 
+  .cooking-step-ingredients-list li {
+    font-size: 0.84rem;
+    padding: 0.28rem 0.52rem;
+  }
+
   .cooking-step-navigation .cooking-step-nav.p-button {
-    flex: 1;
+    min-height: 2.7rem;
     min-width: 0;
+    font-size: 0.93rem !important;
   }
 }
 
