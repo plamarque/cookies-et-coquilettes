@@ -12,7 +12,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 
 1. Création manuelle d’une recette (titre, ingrédients, étapes, portions, temps optionnels, photo optionnelle).
 2. Import assisté d’une recette depuis :
-   - partage système mobile,
+   - partage système mobile (quand la plateforme le permet),
    - écran « Nouvelle recette » : champ de collage (URL/texte/image) + Importer, Saisir à la main, Choisir un fichier.
 3. Structuration lisible de la recette importée sans altérer arbitrairement le sens de la source.
 4. Classement binaire des recettes : `Sucré` / `Salé` (sans tags en v1).
@@ -38,7 +38,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 ### Saisie et import
 
 1. L’utilisateur peut saisir une recette entièrement à la main.
-2. L’utilisateur peut importer une recette via partage, depuis l'écran « Nouvelle recette » : collage (URL/texte/image) + Importer, ou choix fichier, ou saisie manuelle.
+2. L’utilisateur peut importer une recette via partage système (si navigateur/OS compatibles), ou depuis l'écran « Nouvelle recette » : collage (URL/texte/image) + Importer, ou choix fichier, ou saisie manuelle.
 3. Toute recette importée est créée immédiatement et affichée ; l'utilisateur peut l'éditer à tout moment si besoin.
 4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement via l'édition.
 5. Pendant l’import (URL, texte ou image), l’interface affiche un état d’attente explicite indiquant l’analyse en cours.

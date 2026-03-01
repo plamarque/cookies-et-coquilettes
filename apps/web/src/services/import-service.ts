@@ -137,7 +137,7 @@ class BffImportService implements ImportService {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn("importFromShare fallback draft", error);
-      return fallbackDraft("SHARE", payload.title);
+      return fallbackDraft("SHARE", payload.title ?? "Recette partagée", payload.url);
     }
   }
 

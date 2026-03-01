@@ -2,11 +2,11 @@
 
 ## Bugs
 
-Aucun bug identifié pour l’instant (projet vide).
+Aucun bug bloquant documenté.
 
 ## Limitations
 
-- Projet en phase initiale ; aucune fonctionnalité implémentée.
+- `share_target` PWA non pris en charge par Safari (iOS/macOS) et Firefox ; fallback manuel via collage/presse-papiers requis.
 
 ## Différé
 
