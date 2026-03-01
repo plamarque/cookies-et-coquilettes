@@ -249,6 +249,7 @@ body {
   border: 1px solid rgba(31, 79, 70, 0.18);
   border-radius: 0.85rem;
   background: rgba(31, 79, 70, 0.04);
+  touch-action: pan-y;
 }
 
 .cooking-steps-media-image {
@@ -281,6 +282,7 @@ body {
   color: #2f3f39;
   font-size: 0.9rem;
   font-weight: 600;
+  text-align: center;
 }
 
 .cooking-step-text {
@@ -292,6 +294,12 @@ body {
   font-size: 1.15rem;
   line-height: 1.6;
   white-space: pre-line;
+}
+
+.cooking-step-hint {
+  margin: -0.2rem 0 0;
+  color: #3e4b46;
+  font-size: 0.82rem;
 }
 
 .cooking-step-navigation {
@@ -323,6 +331,12 @@ body {
 .cooking-step-dot--active {
   background: var(--p-primary-color, #1f4f46);
   transform: scale(1.08);
+}
+
+.cooking-ingredients-toggle-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.5rem;
 }
 
 .recipe-form-image {
@@ -492,11 +506,17 @@ body {
 
   .cooking-steps-slider {
     padding: 0.75rem;
+    border-radius: 0.75rem;
   }
 
   .cooking-step-text {
-    padding: 0.85rem;
-    font-size: 1.05rem;
+    padding: 0.9rem;
+    font-size: 1.12rem;
+    line-height: 1.65;
+  }
+
+  .cooking-step-hint {
+    font-size: 0.8rem;
   }
 
   .cooking-step-navigation .cooking-step-nav.p-button {

@@ -84,6 +84,8 @@ const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
 const cookingStepIndex = ref(0);
+const showCookingIngredients = ref(false);
+const cookingSwipeStartX = ref<number | null>(null);
 
 const FEATURE_PORTIONS_ENABLED = false;
 
@@ -472,6 +474,7 @@ watch(activeFilters, async () => {
 
 watch(selectedRecipeId, () => {
   cookingStepIndex.value = 0;
+  showCookingIngredients.value = false;
 });
 
 function setError(error: unknown): void {
@@ -600,6 +603,7 @@ function openDetail(recipe: Recipe): void {
   clearMessages();
   selectedRecipeId.value = recipe.id;
   cookingStepIndex.value = 0;
+  showCookingIngredients.value = false;
   servingsInput.value = recipe.servingsCurrent
     ? String(recipe.servingsCurrent)
     : recipe.servingsBase
@@ -719,6 +723,39 @@ function goToPreviousCookingStep(): void {
 
 function goToNextCookingStep(): void {
   goToCookingStep(normalizedCookingStepIndex.value + 1);
+}
+
+function toggleCookingIngredientsVisibility(): void {
+  showCookingIngredients.value = !showCookingIngredients.value;
+}
+
+function onCookingSliderTouchStart(event: TouchEvent): void {
+  const firstTouch = event.touches[0];
+  cookingSwipeStartX.value = firstTouch?.clientX ?? null;
+}
+
+function onCookingSliderTouchEnd(event: TouchEvent): void {
+  if (cookingSwipeStartX.value === null) {
+    return;
+  }
+  const firstTouch = event.changedTouches[0];
+  const endX = firstTouch?.clientX;
+  if (endX === undefined) {
+    cookingSwipeStartX.value = null;
+    return;
+  }
+
+  const deltaX = endX - cookingSwipeStartX.value;
+  cookingSwipeStartX.value = null;
+  if (Math.abs(deltaX) < 45) {
+    return;
+  }
+
+  if (deltaX < 0) {
+    goToNextCookingStep();
+    return;
+  }
+  goToPreviousCookingStep();
 }
 
 async function saveForm(): Promise<void> {
@@ -847,6 +884,7 @@ async function toggleCookingMode(): Promise<void> {
   try {
     if (cookingState.value === "OFF") {
       cookingStepIndex.value = 0;
+      showCookingIngredients.value = false;
       const session = await browserCookingModeService.startCookingMode();
       cookingState.value = session.strategy;
       feedback.value =
@@ -858,6 +896,7 @@ async function toggleCookingMode(): Promise<void> {
 
     await browserCookingModeService.stopCookingMode();
     cookingState.value = "OFF";
+    showCookingIngredients.value = false;
     feedback.value = "Mode cuisine désactivé.";
   } catch (error) {
     setError(error);
@@ -1122,76 +1161,109 @@ onMounted(async () => {
         <Button label="Reset base" text @click="resetServings(selectedRecipe)" />
       </div>
 
-      <h3>Ingrédients</h3>
-      <ul>
-        <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
-          <strong>{{ ingredient.label }}</strong>
-          <span v-if="ingredient.quantity !== undefined">
-            : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
-          </span>
-        </li>
-      </ul>
+      <template v-if="cookingState !== 'OFF'">
+        <h3>Étapes</h3>
+        <div
+          class="cooking-steps-slider"
+          aria-live="polite"
+          @touchstart.passive="onCookingSliderTouchStart"
+          @touchend.passive="onCookingSliderTouchEnd"
+        >
+          <RecipeImage
+            v-if="selectedRecipe.imageId"
+            :image-id="selectedRecipe.imageId"
+            img-class="cooking-steps-media-image"
+          />
+          <div v-else class="cooking-steps-media-placeholder">
+            <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
+            <Button
+              text
+              size="small"
+              icon="pi pi-image"
+              label="Ajouter une image"
+              @click="openEditForm(selectedRecipe)"
+            />
+          </div>
 
-      <h3>Étapes</h3>
-      <div v-if="cookingState !== 'OFF'" class="cooking-steps-slider" aria-live="polite">
-        <RecipeImage
-          v-if="selectedRecipe.imageId"
-          :image-id="selectedRecipe.imageId"
-          img-class="cooking-steps-media-image"
-        />
-        <div v-else class="cooking-steps-media-placeholder">
-          <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
+          <template v-if="currentCookingStep">
+            <p class="cooking-step-status">
+              Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
+            </p>
+            <p class="cooking-step-text">{{ currentCookingStep.text }}</p>
+            <p class="cooking-step-hint">Glissez horizontalement ou utilisez les boutons.</p>
+            <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
+              <Button
+                icon="pi pi-chevron-left"
+                label="Précédente"
+                class="cooking-step-nav"
+                @click="goToPreviousCookingStep"
+              />
+              <Button
+                icon="pi pi-chevron-right"
+                iconPos="right"
+                label="Suivante"
+                class="cooking-step-nav"
+                @click="goToNextCookingStep"
+              />
+            </div>
+            <div
+              v-if="selectedRecipeSteps.length > 1"
+              class="cooking-step-dots"
+              role="tablist"
+              aria-label="Accès direct aux étapes"
+            >
+              <button
+                v-for="(step, index) in selectedRecipeSteps"
+                :key="step.id"
+                type="button"
+                :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
+                :aria-label="`Aller à l'étape ${index + 1}`"
+                :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
+                @click="goToCookingStep(index)"
+              />
+            </div>
+          </template>
+          <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
+        </div>
+
+        <div class="cooking-ingredients-toggle-row">
           <Button
             text
             size="small"
-            icon="pi pi-image"
-            label="Ajouter une image"
-            @click="openEditForm(selectedRecipe)"
+            :icon="showCookingIngredients ? 'pi pi-eye-slash' : 'pi pi-list'"
+            :label="showCookingIngredients ? 'Masquer ingrédients' : 'Voir ingrédients'"
+            @click="toggleCookingIngredientsVisibility"
           />
         </div>
 
-        <template v-if="currentCookingStep">
-          <p class="cooking-step-status">
-            Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
-          </p>
-          <p class="cooking-step-text">{{ currentCookingStep.text }}</p>
-          <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
-            <Button
-              icon="pi pi-chevron-left"
-              label="Précédente"
-              class="cooking-step-nav"
-              @click="goToPreviousCookingStep"
-            />
-            <Button
-              icon="pi pi-chevron-right"
-              iconPos="right"
-              label="Suivante"
-              class="cooking-step-nav"
-              @click="goToNextCookingStep"
-            />
-          </div>
-          <div
-            v-if="selectedRecipeSteps.length > 1"
-            class="cooking-step-dots"
-            role="tablist"
-            aria-label="Accès direct aux étapes"
-          >
-            <button
-              v-for="(step, index) in selectedRecipeSteps"
-              :key="step.id"
-              type="button"
-              :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
-              :aria-label="`Aller à l'étape ${index + 1}`"
-              :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
-              @click="goToCookingStep(index)"
-            />
-          </div>
+        <template v-if="showCookingIngredients">
+          <h3>Ingrédients</h3>
+          <ul>
+            <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
+              <strong>{{ ingredient.label }}</strong>
+              <span v-if="ingredient.quantity !== undefined">
+                : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+              </span>
+            </li>
+          </ul>
         </template>
-        <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
-      </div>
-      <ol v-else>
-        <li v-for="step in selectedRecipeSteps" :key="step.id">{{ step.text }}</li>
-      </ol>
+      </template>
+      <template v-else>
+        <h3>Ingrédients</h3>
+        <ul>
+          <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
+            <strong>{{ ingredient.label }}</strong>
+            <span v-if="ingredient.quantity !== undefined">
+              : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+            </span>
+          </li>
+        </ul>
+
+        <h3>Étapes</h3>
+        <ol>
+          <li v-for="step in selectedRecipeSteps" :key="step.id">{{ step.text }}</li>
+        </ol>
+      </template>
     </section>
 
     <section v-else-if="viewMode === 'FORM'" class="panel form-panel">
