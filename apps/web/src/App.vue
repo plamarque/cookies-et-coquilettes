@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import ConfirmDialog from "primevue/confirmdialog";
 import ProgressSpinner from "primevue/progressspinner";
+import { useConfirm } from "primevue/useconfirm";
 import type {
   ImportSource,
   IngredientLine,
@@ -138,6 +140,7 @@ const INGREDIENT_TOKEN_STOPWORDS = new Set([
 ]);
 
 const form = ref<RecipeFormState>(emptyForm());
+const confirm = useConfirm();
 
 function randomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -756,6 +759,44 @@ function clearMessages(): void {
   errorMessage.value = "";
 }
 
+function requestConfirmation(options: {
+  header: string;
+  message: string;
+  acceptLabel: string;
+  rejectLabel: string;
+  acceptSeverity?: "primary" | "secondary" | "success" | "info" | "warn" | "help" | "danger" | "contrast";
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(value);
+    };
+
+    confirm.require({
+      group: "app-confirmation",
+      header: options.header,
+      message: options.message,
+      icon: "pi pi-question-circle",
+      accept: () => settle(true),
+      reject: () => settle(false),
+      onHide: () => settle(false),
+      rejectProps: {
+        label: options.rejectLabel,
+        severity: "secondary",
+        outlined: true
+      },
+      acceptProps: {
+        label: options.acceptLabel,
+        severity: options.acceptSeverity ?? "primary"
+      }
+    });
+  });
+}
+
 function openCreateForm(): void {
   clearMessages();
   formMode.value = "CREATE";
@@ -1073,9 +1114,13 @@ async function saveForm(): Promise<void> {
 
 async function deleteRecipe(recipe: Recipe): Promise<void> {
   clearMessages();
-  const confirmed = window.confirm(
-    `Supprimer définitivement "${recipe.title}" ? Cette action est irréversible.`
-  );
+  const confirmed = await requestConfirmation({
+    header: "Supprimer la recette",
+    message: `Supprimer définitivement "${recipe.title}" ? Cette action est irréversible.`,
+    acceptLabel: "Supprimer",
+    rejectLabel: "Annuler",
+    acceptSeverity: "danger"
+  });
   if (!confirmed) {
     return;
   }
@@ -1152,12 +1197,16 @@ async function offerPrepTimeUpdateFromCookingSession(
       1,
       Math.round((currentPrepTime + summary.measuredPrepTimeMin) / 2)
     );
-    const shouldUpdate = window.confirm(
-      `Vous avez cuisiné pendant ${summary.elapsedLabel}.\n\n` +
-        `Temps de préparation actuel : ${currentPrepTime} min.\n` +
-        `Temps mesuré cette session : ${summary.measuredPrepTimeMin} min.\n\n` +
-        `Mettre à jour le temps de préparation à ${suggestedPrepTime} min (moyenne) ?`
-    );
+    const shouldUpdate = await requestConfirmation({
+      header: "Mettre à jour le temps de préparation",
+      message:
+        `Vous avez cuisiné pendant ${summary.elapsedLabel}. ` +
+        `Temps actuel: ${currentPrepTime} min. ` +
+        `Temps mesuré: ${summary.measuredPrepTimeMin} min. ` +
+        `Mettre à jour à ${suggestedPrepTime} min (moyenne) ?`,
+      acceptLabel: "Mettre à jour",
+      rejectLabel: "Plus tard"
+    });
 
     if (!shouldUpdate) {
       return;
@@ -1171,11 +1220,15 @@ async function offerPrepTimeUpdateFromCookingSession(
     return;
   }
 
-  const shouldInitialize = window.confirm(
-    `Vous avez cuisiné pendant ${summary.elapsedLabel}.\n\n` +
-      "Aucun temps de préparation n'est enregistré.\n" +
-      `Voulez-vous enregistrer ${summary.measuredPrepTimeMin} min ?`
-  );
+  const shouldInitialize = await requestConfirmation({
+    header: "Enregistrer un temps de préparation",
+    message:
+      `Vous avez cuisiné pendant ${summary.elapsedLabel}. ` +
+      "Aucun temps de préparation n'est enregistré. " +
+      `Enregistrer ${summary.measuredPrepTimeMin} min ?`,
+    acceptLabel: "Enregistrer",
+    rejectLabel: "Plus tard"
+  });
   if (!shouldInitialize) {
     return;
   }
@@ -1326,6 +1379,7 @@ onUnmounted(() => {
 
 <template>
   <main class="app-shell">
+    <ConfirmDialog group="app-confirmation" />
     <section v-if="errorMessage" class="message error">{{ errorMessage }}</section>
     <section v-else-if="feedback" class="message success">{{ feedback }}</section>
 
