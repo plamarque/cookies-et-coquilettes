@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import OpenAI from "openai";
+import { instagramGetUrl, type InstagramResponse } from "instagram-url-direct";
 import type { IngredientLine, ImportType, ParsedRecipeDraft } from "./types.js";
 
 export interface ParseRecipeInput {
@@ -14,7 +15,10 @@ export interface ParseRecipeInput {
 function fallbackDraft(
   title: string,
   sourceType: ImportType,
-  url?: string
+  url?: string,
+  options?: {
+    imageUrl?: string;
+  }
 ): ParsedRecipeDraft {
   const ingredients: IngredientLine[] = [];
   return {
@@ -22,6 +26,7 @@ function fallbackDraft(
     category: "SALE",
     ingredients,
     steps: [],
+    imageUrl: options?.imageUrl,
     source: {
       type: sourceType,
       url,
@@ -340,6 +345,63 @@ function extractMainText(html: string): string {
   return main.replace(/\s+/g, " ").trim().slice(0, 15000);
 }
 
+function isInstagramUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "instagram.com" ||
+      host === "www.instagram.com" ||
+      host === "m.instagram.com" ||
+      host === "instagr.am"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function pickInstagramImage(result: InstagramResponse): string | undefined {
+  const imageMedia = result.media_details.find((media) => media.type === "image" && media.url);
+  if (imageMedia?.url) {
+    return imageMedia.url;
+  }
+  const thumbnailMedia = result.media_details.find((media) => media.thumbnail);
+  if (thumbnailMedia?.thumbnail) {
+    return thumbnailMedia.thumbnail;
+  }
+  return result.url_list.find((candidate) => candidate.startsWith("http"));
+}
+
+function buildInstagramFallbackTitle(result: InstagramResponse): string {
+  const username = result.post_info?.owner_username?.trim();
+  return username ? `Recette Instagram @${username}` : "Recette Instagram";
+}
+
+function buildInstagramPromptText(result: InstagramResponse): string {
+  const caption = result.post_info?.caption?.trim();
+  const username = result.post_info?.owner_username?.trim();
+  if (!caption) {
+    return "";
+  }
+  const contextualizedCaption = username
+    ? `Publication Instagram de @${username}\n\n${caption}`
+    : caption;
+  return contextualizedCaption.slice(0, 12000);
+}
+
+function sanitizeInstagramCaption(raw: string): string {
+  return decodeHtmlEntities(raw)
+    .replace(/\s+/g, " ")
+    .replace(/^[^:]+on Instagram:\s*/i, "")
+    .replace(/^\d+\s+likes?,\s*\d+\s+comments?\s*-\s*[^:]+:\s*/i, "")
+    .trim();
+}
+
+function extractInstagramUsernameFromOgDescription(ogDescription: string): string | undefined {
+  const match = ogDescription.match(/\s-\s([a-z0-9._]+)\s+on\s+/i);
+  return match?.[1]?.trim();
+}
+
 interface LlmRecipePayload {
   title?: string;
   category?: string;
@@ -409,11 +471,12 @@ async function parseWithOpenAI(
   text: string,
   imageUrl: string | undefined,
   url: string | undefined,
-  sourceType: ImportType
+  sourceType: ImportType,
+  fallbackTitle = "Recette importée"
 ): Promise<ParsedRecipeDraft> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return fallbackDraft("Recette importée", sourceType, url);
+    return fallbackDraft(fallbackTitle, sourceType, url, { imageUrl });
   }
 
   const client = new OpenAI({ apiKey });
@@ -440,16 +503,16 @@ ${text.slice(0, 12000)}`;
       temperature: 0.2
     });
     const raw = completion.choices[0]?.message?.content?.trim();
-    if (!raw) return fallbackDraft("Recette importée", sourceType, url);
+    if (!raw) return fallbackDraft(fallbackTitle, sourceType, url, { imageUrl });
     const parsed = parseLlmRecipePayload(raw);
     if (!parsed) {
-      return fallbackDraft("Recette importée", sourceType, url);
+      return fallbackDraft(fallbackTitle, sourceType, url, { imageUrl });
     }
     return toDraftFromLlmPayload(parsed, sourceType, url, imageUrl);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("OpenAI parse error", err);
-    return fallbackDraft("Recette importée", sourceType, url);
+    return fallbackDraft(fallbackTitle, sourceType, url, { imageUrl });
   }
 }
 
@@ -531,8 +594,60 @@ async function fetchUrl(url: string): Promise<string> {
   return res.text();
 }
 
+async function extractInstagramData(url: string): Promise<{
+  captionText: string;
+  imageUrl?: string;
+  fallbackTitle: string;
+}> {
+  const instagramData = await instagramGetUrl(url, { retries: 2, delay: 600 });
+  return {
+    captionText: buildInstagramPromptText(instagramData),
+    imageUrl: pickInstagramImage(instagramData),
+    fallbackTitle: buildInstagramFallbackTitle(instagramData)
+  };
+}
+
+async function extractInstagramFallbackDataFromHtml(url: string): Promise<{
+  captionText: string;
+  imageUrl?: string;
+  fallbackTitle: string;
+} | null> {
+  const html = await fetchUrl(url);
+  const $ = cheerio.load(html);
+  const ogTitle = $('meta[property="og:title"]').attr("content") ?? "";
+  const ogDescription = $('meta[property="og:description"]').attr("content") ?? "";
+  const ogImage = $('meta[property="og:image"]').attr("content");
+
+  const captionFromTitle = sanitizeInstagramCaption(ogTitle);
+  const captionFromDescription = sanitizeInstagramCaption(ogDescription);
+  const captionText = captionFromTitle || captionFromDescription;
+
+  const username = extractInstagramUsernameFromOgDescription(ogDescription);
+  const fallbackTitle = username ? `Recette Instagram @${username}` : "Recette Instagram";
+  const imageUrl = ogImage?.startsWith("http") ? ogImage : undefined;
+
+  if (!captionText && !imageUrl) {
+    return null;
+  }
+
+  return {
+    captionText,
+    imageUrl,
+    fallbackTitle
+  };
+}
+
 /** Extrait uniquement l'URL de l'image depuis une page (og:image, JSON-LD, TwicPics). */
 export async function extractImageFromUrl(url: string): Promise<string | undefined> {
+  if (isInstagramUrl(url)) {
+    try {
+      const instagramData = await extractInstagramData(url);
+      return instagramData.imageUrl;
+    } catch {
+      // Fallback sur extraction HTML standard si le scraper Instagram échoue
+    }
+  }
+
   try {
     const html = await fetchUrl(url);
     const ogImage = extractOgImage(html, url);
@@ -555,6 +670,48 @@ export async function parseRecipeWithCloud(
   const url = input.url;
 
   if (sourceType === "URL" && url) {
+    if (isInstagramUrl(url)) {
+      try {
+        const instagramData = await extractInstagramData(url);
+        if (instagramData.captionText.length > 30) {
+          return parseWithOpenAI(
+            instagramData.captionText,
+            instagramData.imageUrl,
+            url,
+            sourceType,
+            instagramData.fallbackTitle
+          );
+        }
+        return fallbackDraft(instagramData.fallbackTitle, sourceType, url, {
+          imageUrl: instagramData.imageUrl
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("Instagram import error", err);
+      }
+
+      try {
+        const fallbackData = await extractInstagramFallbackDataFromHtml(url);
+        if (fallbackData) {
+          if (fallbackData.captionText.length > 30) {
+            return parseWithOpenAI(
+              fallbackData.captionText,
+              fallbackData.imageUrl,
+              url,
+              sourceType,
+              fallbackData.fallbackTitle
+            );
+          }
+          return fallbackDraft(fallbackData.fallbackTitle, sourceType, url, {
+            imageUrl: fallbackData.imageUrl
+          });
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("Instagram metadata fallback error", err);
+      }
+    }
+
     try {
       const html = await fetchUrl(url);
       const baseUrl = url;
@@ -575,7 +732,7 @@ export async function parseRecipeWithCloud(
 
       const text = extractMainText(html);
       if (text.length > 100) {
-        return parseWithOpenAI(text, ogImage, url, sourceType);
+        return parseWithOpenAI(text, ogImage, url, sourceType, "Recette depuis URL");
       }
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -587,7 +744,13 @@ export async function parseRecipeWithCloud(
   if (sourceType === "TEXT" && input.text) {
     const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
     if (hasOpenAiKey) {
-      return parseWithOpenAI(input.text, undefined, url, sourceType);
+      return parseWithOpenAI(
+        input.text,
+        undefined,
+        url,
+        sourceType,
+        "Recette depuis texte"
+      );
     }
     return fallbackDraft("Recette depuis texte", sourceType, url);
   }
@@ -596,7 +759,13 @@ export async function parseRecipeWithCloud(
     const text = input.text ?? input.shareTitle ?? "";
     const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
     if (hasOpenAiKey && text.length > 50) {
-      return parseWithOpenAI(text, undefined, url, sourceType);
+      return parseWithOpenAI(
+        text,
+        undefined,
+        url,
+        sourceType,
+        input.shareTitle?.trim() || "Recette partagée"
+      );
     }
     return fallbackDraft(input.shareTitle ?? "Recette partagée", sourceType, url);
   }
