@@ -1012,8 +1012,8 @@ body {
 }
 
 .ingredient-icon--modal {
-  width: 12rem;
-  height: 12rem;
+  width: 14rem;
+  height: 14rem;
   object-fit: cover;
   border-radius: 0.75rem;
 }

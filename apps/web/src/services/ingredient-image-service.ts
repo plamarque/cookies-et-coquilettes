@@ -164,3 +164,29 @@ export async function getIngredientImageBlobUrl(
   return URL.createObjectURL(row.blob);
 }
 
+export async function deleteIngredientImage(id: string): Promise<void> {
+  inFlightById.delete(id);
+  await db.ingredientImages.delete(id);
+}
+
+export async function regenerateIngredientImage(
+  id: string,
+  label: string
+): Promise<string | undefined> {
+  await deleteIngredientImage(id);
+  return generateAndStoreIngredientImage(id, label);
+}
+
+export async function storeIngredientImageFromFile(
+  id: string,
+  file: File
+): Promise<string | undefined> {
+  if (!file.type.startsWith("image/")) {
+    return undefined;
+  }
+  const blob = await file.arrayBuffer().then((buf) => new Blob([buf], { type: file.type }));
+  const resizedBlob = await resizeToIngredientIcon(blob);
+  await storeIngredientImage(id, resizedBlob);
+  return id;
+}
+

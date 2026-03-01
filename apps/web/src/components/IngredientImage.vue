@@ -11,6 +11,8 @@ const props = defineProps<{
   imgClass?: string;
   fallbackClass?: string;
   alt?: string;
+  /** Increment to force reload (e.g. after regenerate or file pick) */
+  refreshKey?: number;
 }>();
 
 const blobUrl = ref<string | null>(null);
@@ -57,7 +59,7 @@ async function loadImage(): Promise<void> {
 }
 
 watch(
-  () => [props.label, props.imageId],
+  () => [props.label, props.imageId, props.refreshKey],
   () => {
     void loadImage();
   },

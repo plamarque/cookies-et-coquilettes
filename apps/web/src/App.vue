@@ -100,6 +100,7 @@ const cookingSwipeStartX = ref<number | null>(null);
 
 const selectedIngredientForModal = ref<IngredientLine | null>(null);
 const ingredientModalVisible = ref(false);
+const ingredientImageRefreshKey = ref(0);
 
 const FEATURE_PORTIONS_ENABLED = false;
 const INGREDIENT_TOKEN_STOPWORDS = new Set([
@@ -1570,6 +1571,7 @@ onUnmounted(() => {
           <IngredientImage
             :label="ingredient.label"
             :image-id="ingredient.imageId"
+            :refresh-key="ingredientImageRefreshKey"
             img-class="ingredient-icon ingredient-icon--detail"
             fallback-class="ingredient-icon ingredient-icon--detail"
             :alt="`Ingrédient ${ingredient.label}`"
@@ -1586,6 +1588,8 @@ onUnmounted(() => {
         v-model:visible="ingredientModalVisible"
         :ingredient="selectedIngredientForModal"
         :recipe="selectedRecipe"
+        :refresh-key="ingredientImageRefreshKey"
+        @image-updated="ingredientImageRefreshKey++"
       />
 
       <h3>Étapes</h3>

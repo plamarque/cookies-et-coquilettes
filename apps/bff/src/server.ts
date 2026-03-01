@@ -8,7 +8,14 @@ import { extractImageFromUrl, parseRecipeWithCloud } from "./parsing-client.js";
 import { generateIngredientImage, generateRecipeImage } from "./image-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
+const envPathFromDir = path.resolve(__dirname, "..", "..", "..", ".env");
+const envPathFromCwd = path.resolve(process.cwd(), ".env");
+let envResult = config({ path: envPathFromDir });
+let envPath = envPathFromDir;
+if (envResult.error) {
+  envPath = envPathFromCwd;
+  envResult = config({ path: envPathFromCwd });
+}
 
 const app = express();
 const upload = multer();
@@ -162,4 +169,8 @@ app.post("/api/generate-ingredient-image", async (req, res) => {
 app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`BFF listening on http://localhost:${port} (CORS: ${corsOrigin})`);
+  // eslint-disable-next-line no-console
+  console.log(
+    `  .env: ${envResult.error ? `NOT FOUND (${envPath})` : envPath} | OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? "set" : "NOT SET"}`
+  );
 });
