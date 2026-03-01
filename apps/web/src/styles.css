@@ -240,6 +240,91 @@ body {
   white-space: nowrap;
 }
 
+.cooking-steps-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(31, 79, 70, 0.18);
+  border-radius: 0.85rem;
+  background: rgba(31, 79, 70, 0.04);
+}
+
+.cooking-steps-media-image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  display: block;
+  border-radius: 0.65rem;
+}
+
+.cooking-steps-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px dashed rgba(31, 79, 70, 0.3);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.cooking-steps-media-placeholder p {
+  margin: 0;
+  color: #3e4b46;
+  font-size: 0.9rem;
+}
+
+.cooking-step-status {
+  margin: 0;
+  color: #2f3f39;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.cooking-step-text {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(31, 79, 70, 0.15);
+  border-radius: 0.65rem;
+  background: #fff;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.cooking-step-navigation {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cooking-step-nav.p-button {
+  border-radius: 999px !important;
+}
+
+.cooking-step-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cooking-step-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(31, 79, 70, 0.28);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.cooking-step-dot--active {
+  background: var(--p-primary-color, #1f4f46);
+  transform: scale(1.08);
+}
+
 .recipe-form-image {
   max-width: 100%;
   max-height: 200px;
@@ -403,6 +488,20 @@ body {
     padding: 0;
     border-radius: 50%;
     justify-content: center;
+  }
+
+  .cooking-steps-slider {
+    padding: 0.75rem;
+  }
+
+  .cooking-step-text {
+    padding: 0.85rem;
+    font-size: 1.05rem;
+  }
+
+  .cooking-step-navigation .cooking-step-nav.p-button {
+    flex: 1;
+    min-width: 0;
   }
 }
 

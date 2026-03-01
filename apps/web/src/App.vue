@@ -83,6 +83,7 @@ const recipeIdWithPendingImage = ref<string | null>(null);
 const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
+const cookingStepIndex = ref(0);
 
 const FEATURE_PORTIONS_ENABLED = false;
 
@@ -297,6 +298,29 @@ const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
 
+const selectedRecipeSteps = computed(() => {
+  if (!selectedRecipe.value) {
+    return [];
+  }
+  return [...selectedRecipe.value.steps].sort((a, b) => a.order - b.order);
+});
+
+const normalizedCookingStepIndex = computed(() => {
+  const totalSteps = selectedRecipeSteps.value.length;
+  if (totalSteps === 0) {
+    return 0;
+  }
+  return ((cookingStepIndex.value % totalSteps) + totalSteps) % totalSteps;
+});
+
+const currentCookingStep = computed(() => {
+  const steps = selectedRecipeSteps.value;
+  if (steps.length === 0) {
+    return null;
+  }
+  return steps[normalizedCookingStepIndex.value];
+});
+
 const favoriteCount = computed(() =>
   recipes.value.filter((recipe) => recipe.favorite).length
 );
@@ -446,6 +470,10 @@ watch(activeFilters, async () => {
   await refresh();
 });
 
+watch(selectedRecipeId, () => {
+  cookingStepIndex.value = 0;
+});
+
 function setError(error: unknown): void {
   errorMessage.value = error instanceof Error ? error.message : "Une erreur est survenue.";
   // eslint-disable-next-line no-console
@@ -571,6 +599,7 @@ function startAsyncImageForRecipe(recipeId: string, draft: ParsedRecipeDraft): v
 function openDetail(recipe: Recipe): void {
   clearMessages();
   selectedRecipeId.value = recipe.id;
+  cookingStepIndex.value = 0;
   servingsInput.value = recipe.servingsCurrent
     ? String(recipe.servingsCurrent)
     : recipe.servingsBase
@@ -674,6 +703,22 @@ function removeStep(id: string): void {
   if (form.value.steps.length === 0) {
     form.value.steps.push(emptyStep());
   }
+}
+
+function goToCookingStep(index: number): void {
+  const totalSteps = selectedRecipeSteps.value.length;
+  if (totalSteps === 0) {
+    return;
+  }
+  cookingStepIndex.value = ((index % totalSteps) + totalSteps) % totalSteps;
+}
+
+function goToPreviousCookingStep(): void {
+  goToCookingStep(normalizedCookingStepIndex.value - 1);
+}
+
+function goToNextCookingStep(): void {
+  goToCookingStep(normalizedCookingStepIndex.value + 1);
 }
 
 async function saveForm(): Promise<void> {
@@ -801,6 +846,7 @@ async function toggleCookingMode(): Promise<void> {
   clearMessages();
   try {
     if (cookingState.value === "OFF") {
+      cookingStepIndex.value = 0;
       const session = await browserCookingModeService.startCookingMode();
       cookingState.value = session.strategy;
       feedback.value =
@@ -1087,8 +1133,64 @@ onMounted(async () => {
       </ul>
 
       <h3>Étapes</h3>
-      <ol>
-        <li v-for="step in selectedRecipe.steps" :key="step.id">{{ step.text }}</li>
+      <div v-if="cookingState !== 'OFF'" class="cooking-steps-slider" aria-live="polite">
+        <RecipeImage
+          v-if="selectedRecipe.imageId"
+          :image-id="selectedRecipe.imageId"
+          img-class="cooking-steps-media-image"
+        />
+        <div v-else class="cooking-steps-media-placeholder">
+          <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
+          <Button
+            text
+            size="small"
+            icon="pi pi-image"
+            label="Ajouter une image"
+            @click="openEditForm(selectedRecipe)"
+          />
+        </div>
+
+        <template v-if="currentCookingStep">
+          <p class="cooking-step-status">
+            Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
+          </p>
+          <p class="cooking-step-text">{{ currentCookingStep.text }}</p>
+          <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
+            <Button
+              icon="pi pi-chevron-left"
+              label="Précédente"
+              class="cooking-step-nav"
+              @click="goToPreviousCookingStep"
+            />
+            <Button
+              icon="pi pi-chevron-right"
+              iconPos="right"
+              label="Suivante"
+              class="cooking-step-nav"
+              @click="goToNextCookingStep"
+            />
+          </div>
+          <div
+            v-if="selectedRecipeSteps.length > 1"
+            class="cooking-step-dots"
+            role="tablist"
+            aria-label="Accès direct aux étapes"
+          >
+            <button
+              v-for="(step, index) in selectedRecipeSteps"
+              :key="step.id"
+              type="button"
+              :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
+              :aria-label="`Aller à l'étape ${index + 1}`"
+              :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
+              @click="goToCookingStep(index)"
+            />
+          </div>
+        </template>
+        <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
+      </div>
+      <ol v-else>
+        <li v-for="step in selectedRecipeSteps" :key="step.id">{{ step.text }}</li>
       </ol>
     </section>
 
