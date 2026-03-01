@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
@@ -558,6 +558,17 @@ watch(selectedRecipeId, () => {
   showCookingIngredients.value = false;
 });
 
+watch(
+  cookingState,
+  (state) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.body.style.overflow = state !== "OFF" ? "hidden" : "";
+  },
+  { immediate: true }
+);
+
 function setError(error: unknown): void {
   errorMessage.value = error instanceof Error ? error.message : "Une erreur est survenue.";
   // eslint-disable-next-line no-console
@@ -988,6 +999,12 @@ onMounted(async () => {
   await seedIfEmpty();
   await refresh();
 });
+
+onUnmounted(() => {
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = "";
+  }
+});
 </script>
 
 <template>
@@ -1152,122 +1169,127 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="viewMode === 'DETAIL' && selectedRecipe" class="panel detail">
-      <div
-        v-if="cookingState !== 'OFF'"
-        class="cooking-fullscreen-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mode cuisine plein écran"
-        @touchstart.passive="onCookingSliderTouchStart"
-        @touchend.passive="onCookingSliderTouchEnd"
-      >
-        <div class="cooking-fullscreen-header">
-          <div class="cooking-fullscreen-title-block">
-            <p class="cooking-fullscreen-title">{{ selectedRecipe.title }}</p>
-            <p v-if="currentCookingStep" class="cooking-step-status">
-              Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
-            </p>
-          </div>
-          <Button
-            text
-            icon="pi pi-times"
-            aria-label="Quitter le mode cuisine"
-            class="cooking-fullscreen-close"
-            @click="toggleCookingMode"
-          />
-        </div>
-
-        <RecipeImage
-          v-if="selectedRecipe.imageId"
-          :image-id="selectedRecipe.imageId"
-          img-class="cooking-fullscreen-media-image"
-        />
-        <div v-else class="cooking-fullscreen-media-placeholder">
-          <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
-          <Button
-            text
-            size="small"
-            icon="pi pi-image"
-            label="Ajouter une image"
-            @click="openEditForm(selectedRecipe)"
-          />
-        </div>
-
-        <template v-if="currentCookingStep">
-          <section
-            v-if="currentStepMentionedIngredients.length > 0"
-            class="cooking-step-ingredients"
-            aria-label="Ingrédients mentionnés dans l'étape"
-          >
-            <h3>Ingrédients de cette étape</h3>
-            <ul class="cooking-step-ingredients-list">
-              <li v-for="ingredient in currentStepMentionedIngredients" :key="ingredient.id">
-                <strong>{{ ingredient.label }}</strong>
-                <span v-if="ingredient.quantity !== undefined">
-                  · {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
-                </span>
-              </li>
-            </ul>
-          </section>
-          <p v-else class="cooking-step-ingredients-empty">
-            Aucun ingrédient détecté automatiquement dans cette étape.
-          </p>
-
-          <p class="cooking-step-text cooking-step-text--fullscreen">{{ currentCookingStep.text }}</p>
-          <p class="cooking-step-hint">Glissez horizontalement ou utilisez les boutons.</p>
-
-          <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
+      <Teleport v-if="cookingState !== 'OFF'" to="body">
+        <div
+          class="cooking-fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mode cuisine plein écran"
+          @touchstart.passive="onCookingSliderTouchStart"
+          @touchend.passive="onCookingSliderTouchEnd"
+        >
+          <div class="cooking-fullscreen-header">
+            <div class="cooking-fullscreen-title-block">
+              <p class="cooking-fullscreen-title">{{ selectedRecipe.title }}</p>
+              <p v-if="currentCookingStep" class="cooking-step-status">
+                Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
+              </p>
+            </div>
             <Button
-              icon="pi pi-chevron-left"
-              label="Précédente"
-              class="cooking-step-nav"
-              @click="goToPreviousCookingStep"
-            />
-            <Button
-              icon="pi pi-chevron-right"
-              iconPos="right"
-              label="Suivante"
-              class="cooking-step-nav"
-              @click="goToNextCookingStep"
+              text
+              icon="pi pi-times"
+              aria-label="Quitter le mode cuisine"
+              class="cooking-fullscreen-close"
+              @click="toggleCookingMode"
             />
           </div>
-          <div
-            v-if="selectedRecipeSteps.length > 1"
-            class="cooking-step-dots"
-            role="tablist"
-            aria-label="Accès direct aux étapes"
-          >
-            <button
-              v-for="(step, index) in selectedRecipeSteps"
-              :key="step.id"
-              type="button"
-              :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
-              :aria-label="`Aller à l'étape ${index + 1}`"
-              :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
-              @click="goToCookingStep(index)"
-            />
-          </div>
-        </template>
-        <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
 
-        <div class="cooking-ingredients-toggle-row">
-          <Button
-            text
-            size="small"
-            :icon="showCookingIngredients ? 'pi pi-eye-slash' : 'pi pi-list'"
-            :label="showCookingIngredients ? 'Masquer tous les ingrédients' : 'Voir tous les ingrédients'"
-            @click="toggleCookingIngredientsVisibility"
-          />
+          <div class="cooking-fullscreen-media-zone">
+            <RecipeImage
+              v-if="selectedRecipe.imageId"
+              :image-id="selectedRecipe.imageId"
+              img-class="cooking-fullscreen-media-image"
+            />
+            <div v-else class="cooking-fullscreen-media-placeholder">
+              <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
+              <Button
+                text
+                size="small"
+                icon="pi pi-image"
+                label="Ajouter une image"
+                @click="openEditForm(selectedRecipe)"
+              />
+            </div>
+
+            <section
+              class="cooking-media-ingredients-overlay"
+              aria-label="Ingrédients mentionnés dans l'étape"
+            >
+              <h3>Ingrédients de l'étape</h3>
+              <ul
+                v-if="currentStepMentionedIngredients.length > 0"
+                class="cooking-media-ingredients-list"
+              >
+                <li v-for="ingredient in currentStepMentionedIngredients" :key="ingredient.id">
+                  <span class="cooking-media-ingredients-label">{{ ingredient.label }}</span>
+                  <span v-if="ingredient.quantity !== undefined" class="cooking-media-ingredients-qty">
+                    {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+                  </span>
+                </li>
+              </ul>
+              <p v-else class="cooking-media-ingredients-empty">
+                Aucun ingrédient détecté automatiquement.
+              </p>
+            </section>
+          </div>
+
+          <template v-if="currentCookingStep">
+            <p class="cooking-step-text cooking-step-text--fullscreen">{{ currentCookingStep.text }}</p>
+            <p class="cooking-step-hint">Glissez horizontalement ou utilisez les boutons.</p>
+
+            <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
+              <Button
+                icon="pi pi-chevron-left"
+                label="Précédente"
+                class="cooking-step-nav"
+                @click="goToPreviousCookingStep"
+              />
+              <Button
+                icon="pi pi-chevron-right"
+                iconPos="right"
+                label="Suivante"
+                class="cooking-step-nav"
+                @click="goToNextCookingStep"
+              />
+            </div>
+            <div
+              v-if="selectedRecipeSteps.length > 1"
+              class="cooking-step-dots"
+              role="tablist"
+              aria-label="Accès direct aux étapes"
+            >
+              <button
+                v-for="(step, index) in selectedRecipeSteps"
+                :key="step.id"
+                type="button"
+                :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
+                :aria-label="`Aller à l'étape ${index + 1}`"
+                :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
+                @click="goToCookingStep(index)"
+              />
+            </div>
+          </template>
+          <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
+
+          <div class="cooking-ingredients-toggle-row">
+            <Button
+              text
+              size="small"
+              :icon="showCookingIngredients ? 'pi pi-eye-slash' : 'pi pi-list'"
+              :label="showCookingIngredients ? 'Masquer tous les ingrédients' : 'Voir tous les ingrédients'"
+              @click="toggleCookingIngredientsVisibility"
+            />
+          </div>
+          <ul v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
+            <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
+              <strong>{{ ingredient.label }}</strong>
+              <span v-if="ingredient.quantity !== undefined">
+                : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+              </span>
+            </li>
+          </ul>
         </div>
-        <ul v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
-          <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
-            <strong>{{ ingredient.label }}</strong>
-            <span v-if="ingredient.quantity !== undefined">
-              : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
-            </span>
-          </li>
-        </ul>
-      </div>
+      </Teleport>
 
       <div class="recipe-detail-header">
         <RecipeImage

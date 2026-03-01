@@ -243,6 +243,10 @@ body {
 .cooking-fullscreen-overlay {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  box-sizing: border-box;
   z-index: 50;
   display: flex;
   flex-direction: column;
@@ -288,6 +292,10 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+.cooking-fullscreen-media-zone {
+  position: relative;
+}
+
 .cooking-fullscreen-media-image {
   width: 100%;
   min-height: 170px;
@@ -301,8 +309,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.8rem;
+  min-height: 170px;
+  max-height: 34vh;
   border: 1px dashed rgba(31, 79, 70, 0.32);
   border-radius: 0.8rem;
   background: rgba(255, 255, 255, 0.86);
@@ -321,48 +332,61 @@ body {
   font-weight: 700;
 }
 
-.cooking-step-ingredients {
+.cooking-media-ingredients-overlay {
+  position: absolute;
+  left: 0.55rem;
+  right: 0.55rem;
+  bottom: 0.55rem;
   margin: 0;
-  padding: 0.75rem;
-  border: 1px solid rgba(31, 79, 70, 0.2);
-  border-radius: 0.8rem;
-  background: rgba(255, 255, 255, 0.9);
+  padding: 0.55rem 0.62rem;
+  border-radius: 0.7rem;
+  background: rgba(16, 22, 20, 0.58);
+  color: #fff;
+  backdrop-filter: blur(2px);
 }
 
-.cooking-step-ingredients h3 {
-  margin: 0 0 0.5rem;
+.cooking-media-ingredients-overlay h3 {
+  margin: 0 0 0.4rem;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #2f3f39;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.cooking-step-ingredients-list {
+.cooking-media-ingredients-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  max-height: 5.4rem;
+  overflow-y: auto;
 }
 
-.cooking-step-ingredients-list li {
+.cooking-media-ingredients-list li {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  background: rgba(31, 79, 70, 0.08);
-  font-size: 0.9rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.22rem 0.5rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 0.84rem;
+  line-height: 1.2;
 }
 
-.cooking-step-ingredients-empty {
+.cooking-media-ingredients-label {
+  font-weight: 700;
+}
+
+.cooking-media-ingredients-qty {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cooking-media-ingredients-empty {
   margin: 0;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.85);
-  color: #3e4b46;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .cooking-step-text {
@@ -375,8 +399,8 @@ body {
   border: 1px solid rgba(31, 79, 70, 0.2);
   border-radius: 0.9rem;
   background: #fff;
-  font-size: clamp(1.45rem, 5.8vw, 2.35rem);
-  line-height: 1.5;
+  font-size: clamp(1.7rem, 7.2vw, 2.9rem);
+  line-height: 1.52;
   font-weight: 600;
 }
 
@@ -613,19 +637,41 @@ body {
     min-height: 145px;
   }
 
+  .cooking-fullscreen-media-placeholder {
+    min-height: 145px;
+    max-height: 31vh;
+  }
+
   .cooking-step-text--fullscreen {
     padding: 1rem;
-    font-size: clamp(1.45rem, 7vw, 2rem);
-    line-height: 1.52;
+    font-size: clamp(1.75rem, 8.7vw, 2.4rem);
+    line-height: 1.5;
   }
 
   .cooking-step-hint {
     font-size: 0.8rem;
   }
 
-  .cooking-step-ingredients-list li {
-    font-size: 0.84rem;
-    padding: 0.28rem 0.52rem;
+  .cooking-media-ingredients-overlay {
+    left: 0.45rem;
+    right: 0.45rem;
+    bottom: 0.45rem;
+    padding: 0.46rem 0.5rem;
+  }
+
+  .cooking-media-ingredients-overlay h3 {
+    font-size: 0.74rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .cooking-media-ingredients-list {
+    max-height: 4.8rem;
+  }
+
+  .cooking-media-ingredients-list li {
+    font-size: 0.74rem;
+    padding: 0.2rem 0.4rem;
+    gap: 0.35rem;
   }
 
   .cooking-step-navigation .cooking-step-nav.p-button {
