@@ -996,6 +996,28 @@ body {
   margin-bottom: 0.45rem;
 }
 
+.ingredient-line--clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 0.5rem;
+  padding: 0.25rem 0;
+  margin-left: -0.25rem;
+  margin-right: -0.25rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.ingredient-line--clickable:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.ingredient-icon--modal {
+  width: 12rem;
+  height: 12rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+}
+
 .ingredient-line-text {
   display: inline-flex;
   gap: 0.25rem;

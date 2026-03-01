@@ -5,6 +5,7 @@ import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
 import type {
   ImportSource,
+  IngredientLine,
   ParsedRecipeDraft,
   Recipe,
   RecipeCategory,
@@ -14,6 +15,7 @@ import type {
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
 import IngredientImage from "./components/IngredientImage.vue";
+import IngredientDetailModal from "./components/IngredientDetailModal.vue";
 import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
 import { db } from "./storage/db";
@@ -95,6 +97,9 @@ const servingsInput = ref("");
 const cookingStepIndex = ref(0);
 const showCookingIngredients = ref(false);
 const cookingSwipeStartX = ref<number | null>(null);
+
+const selectedIngredientForModal = ref<IngredientLine | null>(null);
+const ingredientModalVisible = ref(false);
 
 const FEATURE_PORTIONS_ENABLED = false;
 const INGREDIENT_TOKEN_STOPWORDS = new Set([
@@ -674,6 +679,11 @@ function openCreateForm(): void {
   formRecipeId.value = null;
   form.value = emptyForm();
   viewMode.value = "FORM";
+}
+
+function openIngredientModal(ingredient: IngredientLine): void {
+  selectedIngredientForModal.value = ingredient;
+  ingredientModalVisible.value = true;
 }
 
 async function openEditForm(recipe: Recipe): Promise<void> {
@@ -1546,7 +1556,17 @@ onUnmounted(() => {
 
       <h3>Ingrédients</h3>
       <ul class="ingredient-list">
-        <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id" class="ingredient-line">
+        <li
+          v-for="ingredient in selectedRecipeIngredientsSorted"
+          :key="ingredient.id"
+          class="ingredient-line ingredient-line--clickable"
+          role="button"
+          tabindex="0"
+          :aria-label="`Voir les détails de ${ingredient.label}`"
+          @click="openIngredientModal(ingredient)"
+          @keydown.enter="openIngredientModal(ingredient)"
+          @keydown.space.prevent="openIngredientModal(ingredient)"
+        >
           <IngredientImage
             :label="ingredient.label"
             :image-id="ingredient.imageId"
@@ -1562,6 +1582,11 @@ onUnmounted(() => {
           </span>
         </li>
       </ul>
+      <IngredientDetailModal
+        v-model:visible="ingredientModalVisible"
+        :ingredient="selectedIngredientForModal"
+        :recipe="selectedRecipe"
+      />
 
       <h3>Étapes</h3>
       <ol>
