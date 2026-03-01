@@ -18,6 +18,7 @@ import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./ser
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService, generateRecipeImage } from "./services/import-service";
+import { buildInstagramEmbedUrl } from "./utils/instagram-embed";
 import {
   clearShareImportParamsFromWindowLocation,
   readShareImportPayloadFromWindow
@@ -308,6 +309,14 @@ const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
 
+const selectedRecipeInstagramEmbedUrl = computed(() =>
+  buildInstagramEmbedUrl(selectedRecipe.value?.source?.url)
+);
+
+const formInstagramEmbedUrl = computed(() =>
+  buildInstagramEmbedUrl(form.value.source?.url)
+);
+
 const favoriteCount = computed(() =>
   recipes.value.filter((recipe) => recipe.favorite).length
 );
@@ -554,6 +563,9 @@ function fallbackImportMessage(source?: ImportSource): string {
     case "SHARE":
       return "L'extraction du partage a échoué. Complétez manuellement la recette.";
     case "URL":
+      if (buildInstagramEmbedUrl(source.url)) {
+        return "L'extraction du post Instagram est incomplète. Complétez manuellement la recette ; l'aperçu du post/reel reste affiché.";
+      }
       return "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
     default:
       return "L'extraction a échoué. Complétez manuellement la recette.";
@@ -1077,6 +1089,16 @@ onMounted(async () => {
         >
           {{ imageLoadingMessage }}
         </div>
+        <div v-else-if="selectedRecipeInstagramEmbedUrl" class="recipe-detail-embed-wrapper">
+          <iframe
+            :src="selectedRecipeInstagramEmbedUrl"
+            title="Aperçu Instagram"
+            class="recipe-detail-instagram-embed"
+            loading="lazy"
+            allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+            allowfullscreen
+          />
+        </div>
         <div v-else class="recipe-detail-image-placeholder" />
         <div class="recipe-detail-header-actions">
           <Button
@@ -1260,22 +1282,35 @@ onMounted(async () => {
           <ProgressSpinner style="width: 2rem; height: 2rem" strokeWidth="4" />
           <span>{{ imageReextracting ? "Extraction de la recette en cours…" : "Génération de l'image en cours…" }}</span>
         </div>
-        <div v-else class="row" style="gap: 0.5rem; flex-wrap: wrap">
-          <Button
-            text
-            size="small"
-            icon="pi pi-image"
-            label="Ajouter une image"
-            @click="triggerFormImagePick"
-          />
-          <Button
-            text
-            size="small"
-            icon="pi pi-sparkles"
-            label="Générer une image"
-            :loading="imageGenerating"
-            @click="triggerImageGeneration"
-          />
+        <div v-else class="stack recipe-form-media-fallback">
+          <div v-if="formInstagramEmbedUrl" class="recipe-form-embed-wrapper">
+            <iframe
+              :src="formInstagramEmbedUrl"
+              title="Aperçu Instagram"
+              class="recipe-form-instagram-embed"
+              loading="lazy"
+              allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+              allowfullscreen
+            />
+            <small class="muted">Aperçu du post/reel Instagram importé.</small>
+          </div>
+          <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
+            <Button
+              text
+              size="small"
+              icon="pi pi-image"
+              label="Ajouter une image"
+              @click="triggerFormImagePick"
+            />
+            <Button
+              text
+              size="small"
+              icon="pi pi-sparkles"
+              label="Générer une image"
+              :loading="imageGenerating"
+              @click="triggerImageGeneration"
+            />
+          </div>
         </div>
         <input
           ref="formImageInputRef"
