@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import ConfirmDialog from "primevue/confirmdialog";
 import ProgressSpinner from "primevue/progressspinner";
+import { useConfirm } from "primevue/useconfirm";
 import type {
   ImportSource,
   IngredientLine,
@@ -63,6 +65,12 @@ interface RecipeFormState {
   imageId?: string | null;
 }
 
+interface CookingSessionTimingSummary {
+  elapsedLabel: string;
+  measuredPrepTimeMin: number;
+  recipeId: string | null;
+}
+
 const recipes = ref<Recipe[]>([]);
 const selectedRecipeId = ref<string | null>(null);
 const viewMode = ref<ViewMode>("LIST");
@@ -104,6 +112,8 @@ const cookingSwipeStartX = ref<number | null>(null);
 const currentCookingStepImageUrl = ref<string | null>(null);
 const cookingStepImageLoading = ref(false);
 let cookingStepImageLoadCounter = 0;
+const cookingModeStartedAt = ref<number | null>(null);
+const cookingModeRecipeId = ref<string | null>(null);
 
 const selectedIngredientForModal = ref<IngredientLine | null>(null);
 const ingredientModalVisible = ref(false);
@@ -130,6 +140,7 @@ const INGREDIENT_TOKEN_STOPWORDS = new Set([
 ]);
 
 const form = ref<RecipeFormState>(emptyForm());
+const confirm = useConfirm();
 
 function randomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -748,6 +759,44 @@ function clearMessages(): void {
   errorMessage.value = "";
 }
 
+function requestConfirmation(options: {
+  header: string;
+  message: string;
+  acceptLabel: string;
+  rejectLabel: string;
+  acceptSeverity?: "primary" | "secondary" | "success" | "info" | "warn" | "help" | "danger" | "contrast";
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(value);
+    };
+
+    confirm.require({
+      group: "app-confirmation",
+      header: options.header,
+      message: options.message,
+      icon: "pi pi-question-circle",
+      accept: () => settle(true),
+      reject: () => settle(false),
+      onHide: () => settle(false),
+      rejectProps: {
+        label: options.rejectLabel,
+        severity: "secondary",
+        outlined: true
+      },
+      acceptProps: {
+        label: options.acceptLabel,
+        severity: options.acceptSeverity ?? "primary"
+      }
+    });
+  });
+}
+
 function openCreateForm(): void {
   clearMessages();
   formMode.value = "CREATE";
@@ -1065,9 +1114,13 @@ async function saveForm(): Promise<void> {
 
 async function deleteRecipe(recipe: Recipe): Promise<void> {
   clearMessages();
-  const confirmed = window.confirm(
-    `Supprimer définitivement "${recipe.title}" ? Cette action est irréversible.`
-  );
+  const confirmed = await requestConfirmation({
+    header: "Supprimer la recette",
+    message: `Supprimer définitivement "${recipe.title}" ? Cette action est irréversible.`,
+    acceptLabel: "Supprimer",
+    rejectLabel: "Annuler",
+    acceptSeverity: "danger"
+  });
   if (!confirmed) {
     return;
   }
@@ -1097,6 +1150,96 @@ function formatRecipeTime(recipe: Recipe): string {
     return `${cook} min cuisson`;
   }
   return "";
+}
+
+function formatElapsedCookingTime(elapsedMilliseconds: number): string {
+  const totalSeconds = Math.max(1, Math.round(elapsedMilliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) {
+    return `${totalSeconds} s`;
+  }
+  if (seconds === 0) {
+    return `${minutes} min`;
+  }
+  return `${minutes} min ${seconds} s`;
+}
+
+function buildCookingSessionTimingSummary(): CookingSessionTimingSummary | null {
+  if (cookingModeStartedAt.value === null) {
+    return null;
+  }
+
+  const elapsedMilliseconds = Math.max(0, Date.now() - cookingModeStartedAt.value);
+  return {
+    elapsedLabel: formatElapsedCookingTime(elapsedMilliseconds),
+    measuredPrepTimeMin: Math.max(1, Math.round(elapsedMilliseconds / 60000)),
+    recipeId: cookingModeRecipeId.value
+  };
+}
+
+async function offerPrepTimeUpdateFromCookingSession(
+  summary: CookingSessionTimingSummary
+): Promise<void> {
+  if (!summary.recipeId) {
+    return;
+  }
+
+  const recipe = recipes.value.find((candidate) => candidate.id === summary.recipeId);
+  if (!recipe) {
+    return;
+  }
+
+  const currentPrepTime = recipe.prepTimeMin;
+  if (currentPrepTime && currentPrepTime > 0) {
+    const suggestedPrepTime = Math.max(
+      1,
+      Math.round((currentPrepTime + summary.measuredPrepTimeMin) / 2)
+    );
+    const shouldUpdate = await requestConfirmation({
+      header: "Mettre à jour le temps de préparation",
+      message:
+        `Vous avez cuisiné pendant ${summary.elapsedLabel}. ` +
+        `Temps actuel: ${currentPrepTime} min. ` +
+        `Temps mesuré: ${summary.measuredPrepTimeMin} min. ` +
+        `Mettre à jour à ${suggestedPrepTime} min (moyenne) ?`,
+      acceptLabel: "Mettre à jour",
+      rejectLabel: "Plus tard"
+    });
+
+    if (!shouldUpdate) {
+      return;
+    }
+
+    await dexieRecipeService.updateRecipe(recipe.id, { prepTimeMin: suggestedPrepTime });
+    await refresh();
+    feedback.value =
+      `Mode cuisine désactivé. Temps passé : ${summary.elapsedLabel}. ` +
+      `Temps de préparation mis à jour à ${suggestedPrepTime} min (moyenne).`;
+    return;
+  }
+
+  const shouldInitialize = await requestConfirmation({
+    header: "Enregistrer un temps de préparation",
+    message:
+      `Vous avez cuisiné pendant ${summary.elapsedLabel}. ` +
+      "Aucun temps de préparation n'est enregistré. " +
+      `Enregistrer ${summary.measuredPrepTimeMin} min ?`,
+    acceptLabel: "Enregistrer",
+    rejectLabel: "Plus tard"
+  });
+  if (!shouldInitialize) {
+    return;
+  }
+
+  await dexieRecipeService.updateRecipe(recipe.id, {
+    prepTimeMin: summary.measuredPrepTimeMin
+  });
+  await refresh();
+  feedback.value =
+    `Mode cuisine désactivé. Temps passé : ${summary.elapsedLabel}. ` +
+    `Temps de préparation mis à jour à ${summary.measuredPrepTimeMin} min.`;
 }
 
 function ingredientPreviewForCard(
@@ -1168,15 +1311,31 @@ async function resetServings(recipe: Recipe): Promise<void> {
   await scaleToInput(recipe);
 }
 
-async function stopCookingModeIfActive(): Promise<void> {
-  if (cookingState.value !== "OFF") {
-    try {
-      await browserCookingModeService.stopCookingMode();
-      cookingState.value = "OFF";
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn("stopCookingMode failed", error);
+async function stopCookingModeIfActive(
+  options?: { offerPrepTimeUpdate?: boolean }
+): Promise<void> {
+  if (cookingState.value === "OFF") {
+    return;
+  }
+
+  const timingSummary = buildCookingSessionTimingSummary();
+  try {
+    await browserCookingModeService.stopCookingMode();
+    cookingState.value = "OFF";
+    showCookingIngredients.value = false;
+    cookingModeStartedAt.value = null;
+    cookingModeRecipeId.value = null;
+
+    feedback.value = timingSummary
+      ? `Mode cuisine désactivé. Temps passé : ${timingSummary.elapsedLabel}.`
+      : "Mode cuisine désactivé.";
+
+    if ((options?.offerPrepTimeUpdate ?? true) && timingSummary) {
+      await offerPrepTimeUpdateFromCookingSession(timingSummary);
     }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("stopCookingMode failed", error);
   }
 }
 
@@ -1188,6 +1347,8 @@ async function toggleCookingMode(): Promise<void> {
       showCookingIngredients.value = false;
       const session = await browserCookingModeService.startCookingMode();
       cookingState.value = session.strategy;
+      cookingModeStartedAt.value = Date.now();
+      cookingModeRecipeId.value = selectedRecipeId.value;
       feedback.value =
         session.strategy === "WAKE_LOCK"
           ? "Mode cuisine actif (Wake Lock)."
@@ -1195,10 +1356,7 @@ async function toggleCookingMode(): Promise<void> {
       return;
     }
 
-    await browserCookingModeService.stopCookingMode();
-    cookingState.value = "OFF";
-    showCookingIngredients.value = false;
-    feedback.value = "Mode cuisine désactivé.";
+    await stopCookingModeIfActive({ offerPrepTimeUpdate: true });
   } catch (error) {
     setError(error);
   }
@@ -1221,6 +1379,7 @@ onUnmounted(() => {
 
 <template>
   <main class="app-shell">
+    <ConfirmDialog group="app-confirmation" />
     <section v-if="errorMessage" class="message error">{{ errorMessage }}</section>
     <section v-else-if="feedback" class="message success">{{ feedback }}</section>
 
