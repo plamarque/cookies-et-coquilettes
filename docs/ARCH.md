@@ -28,6 +28,7 @@ Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScr
 | `app-shell` | Initialisation Vue/PWA/PrimeVue | `apps/web/src/main.ts` |
 | `recipe-service` | CRUD recettes, favoris, portions | `apps/web/src/services/recipe-service.ts` |
 | `import-service` | Import URL/share/screenshot/texte + appel BFF | `apps/web/src/services/import-service.ts` |
+| `share-target-service` | Lecture/nettoyage des paramètres `share_target` au démarrage | `apps/web/src/services/share-target-service.ts` |
 | `cooking-mode-service` | Wake Lock + fallback navigateur | `apps/web/src/services/cooking-mode-service.ts` |
 | `db` | Schéma IndexedDB et accès tables | `apps/web/src/storage/db.ts` |
 | `ingredient-image-service` | Résolution d'image ingrédient (cache local, génération IA), stockage | `apps/web/src/services/ingredient-image-service.ts` |
@@ -61,6 +62,7 @@ Règles de contrat :
 Règles de contrat :
 - flux direct : `parse -> create -> détail` ; image en arrière-plan si absente,
 - l’UI expose un état de progression pendant l’import (analyse URL/texte, lecture image),
+- pour un payload `SHARE` contenant une URL, priorité à l’extraction depuis l’URL partagée,
 - la `source` d’import est persistée avec `type + capturedAt` même quand `url` est absente,
 - en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
 
@@ -150,8 +152,10 @@ Le BFF charge `.env` à la racine du projet (dotenv) pour `OPENAI_API_KEY`. L’
    - utiliser `navigator.wakeLock` si disponible,
    - fallback visuel/instructionnel sinon.
 2. Share Target :
-   - activer dans le manifest PWA,
-   - conserver une entrée manuelle URL/texte/screenshot pour tous les navigateurs.
+   - activer dans le manifest PWA (`share_target`) avec réception de payload URL/texte/titre,
+   - support principal : Chromium (Android/desktop) avec PWA installée,
+   - non supporté nativement sur Safari (iOS/macOS) ni Firefox,
+   - conserver un fallback manuel universel : collage URL/texte/image + lecture presse-papiers.
 
 ## Arborescence cible
 
