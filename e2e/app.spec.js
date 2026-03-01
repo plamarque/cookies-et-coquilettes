@@ -78,6 +78,70 @@ test.describe("Cookies & Coquillettes v1", () => {
     await expect(page.locator("section.panel.detail, section.panel.form-panel")).toBeVisible();
   });
 
+  test("images ingrédient : icône visible sur détail et carte", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Nouvelle recette" }).click();
+    await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
+    await page.getByRole("button", { name: "Saisir à la main" }).click();
+    await page.getByLabel("Titre").fill("Recette images ingrédient");
+    await page.getByLabel(/ingredient-label-/).first().fill("Farine");
+    await page.getByLabel(/ingredient-quantity-/).first().fill("200");
+    await page.getByLabel(/ingredient-unit-/).first().fill("g");
+    await page.getByLabel(/step-text-/).first().fill("Mélanger");
+    await saveRecipeForm(page);
+
+    await expect(page.getByRole("heading", { name: "Recette images ingrédient" })).toBeVisible();
+    await expect(page.locator(".ingredient-line .ingredient-icon--detail").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Retour" }).click();
+    const recipeCard = page.locator(".recipe-card", {
+      hasText: "Recette images ingrédient"
+    }).first();
+    await expect(recipeCard.locator(".recipe-card-ingredient-icons .ingredient-icon--card").first()).toBeVisible();
+  });
+
+  test("ordre des ingrédients conservé après sauvegarde", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Nouvelle recette" }).click();
+    await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
+    await page.getByRole("button", { name: "Saisir à la main" }).click();
+
+    await page.getByLabel("Titre").fill("Recette ordre ingrédients");
+
+    // 1er ingrédient
+    await page.getByLabel(/ingredient-quantity-/).first().fill("100");
+    await page.getByLabel(/ingredient-label-/).first().fill("Sucre");
+    await page.getByLabel(/ingredient-unit-/).first().fill("g");
+
+    // 2e ingrédient
+    await page.getByRole("button", { name: "Ajouter ingrédient" }).click();
+    await page.getByLabel(/ingredient-quantity-/).nth(1).fill("200");
+    await page.getByLabel(/ingredient-label-/).nth(1).fill("Farine");
+    await page.getByLabel(/ingredient-unit-/).nth(1).fill("g");
+
+    // 3e ingrédient
+    await page.getByRole("button", { name: "Ajouter ingrédient" }).click();
+    await page.getByLabel(/ingredient-quantity-/).nth(2).fill("2");
+    await page.getByLabel(/ingredient-label-/).nth(2).fill("Oeuf");
+    await page.getByLabel(/ingredient-unit-/).nth(2).fill("pièce");
+
+    await page.getByLabel(/step-text-/).first().fill("Mélanger");
+    await saveRecipeForm(page);
+    await expect(page.getByRole("heading", { name: "Recette ordre ingrédients" })).toBeVisible();
+
+    const detailIngredients = page.locator(".ingredient-line strong");
+    await expect(detailIngredients).toHaveCount(3);
+    await expect(detailIngredients.nth(0)).toHaveText("Sucre");
+    await expect(detailIngredients.nth(1)).toHaveText("Farine");
+    await expect(detailIngredients.nth(2)).toHaveText("Oeuf");
+
+    await page.getByRole("button", { name: "Éditer" }).click();
+    await expect(page.getByRole("heading", { name: "Éditer recette" })).toBeVisible();
+    await expect(page.getByLabel(/ingredient-label-/).nth(0)).toHaveValue("Sucre");
+    await expect(page.getByLabel(/ingredient-label-/).nth(1)).toHaveValue("Farine");
+    await expect(page.getByLabel(/ingredient-label-/).nth(2)).toHaveValue("Oeuf");
+  });
+
   test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
     page
   }) => {

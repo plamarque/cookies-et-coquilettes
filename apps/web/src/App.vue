@@ -13,6 +13,7 @@ import type {
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
+import IngredientImage from "./components/IngredientImage.vue";
 import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
 import { db } from "./storage/db";
@@ -34,6 +35,7 @@ interface IngredientInput {
   quantity: string;
   unit: string;
   isScalable: boolean;
+  imageId?: string;
 }
 
 interface StepInput {
@@ -145,14 +147,17 @@ function toForm(recipe: Recipe): RecipeFormState {
     cookTimeMin: recipe.cookTimeMin ? String(recipe.cookTimeMin) : "",
     ingredients:
       recipe.ingredients.length > 0
-        ? recipe.ingredients.map((ingredient) => ({
-            id: ingredient.id,
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable
-          }))
+        ? [...recipe.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id,
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       recipe.steps.length > 0
@@ -177,14 +182,17 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
     imageId: undefined,
     ingredients:
       draft.ingredients.length > 0
-        ? draft.ingredients.map((ingredient) => ({
-            id: ingredient.id || randomId(),
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable
-          }))
+        ? [...draft.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id || randomId(),
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       draft.steps.length > 0
@@ -244,7 +252,7 @@ function formToRecipe(existing?: Recipe): Recipe {
       }
     : existing?.source;
   const ingredients = form.value.ingredients
-    .map((ingredient) => {
+    .map((ingredient, index) => {
       const label = ingredient.label.trim();
       const quantity = parseNumber(ingredient.quantity);
       if (!label) {
@@ -253,12 +261,14 @@ function formToRecipe(existing?: Recipe): Recipe {
 
       return {
         id: ingredient.id,
+        order: index + 1,
         label,
         quantity,
         quantityBase: ingredient.isScalable ? quantity : undefined,
         unit: ingredient.unit.trim() || undefined,
         isScalable: ingredient.isScalable,
-        rawText: label
+        rawText: label,
+        imageId: ingredient.imageId
       };
     })
     .filter((ingredient): ingredient is NonNullable<typeof ingredient> => ingredient !== null);
@@ -308,6 +318,12 @@ function formToRecipe(existing?: Recipe): Recipe {
 const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
+
+const selectedRecipeIngredientsSorted = computed(() => {
+  const recipe = selectedRecipe.value;
+  if (!recipe?.ingredients.length) return [];
+  return [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+});
 
 const selectedRecipeInstagramEmbedUrl = computed(() =>
   buildInstagramEmbedUrl(selectedRecipe.value?.source?.url)
@@ -826,6 +842,39 @@ function formatRecipeTime(recipe: Recipe): string {
   return "";
 }
 
+function ingredientPreviewForCard(
+  recipe: Recipe
+): Array<{ key: string; label: string; imageId?: string }> {
+  const previews: Array<{ key: string; label: string; imageId?: string }> = [];
+  const seen = new Set<string>();
+  const sorted = [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const ingredient of sorted) {
+    const label = ingredient.label.trim();
+    if (!label) {
+      continue;
+    }
+
+    const dedupeKey = ingredient.imageId?.trim() || label.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+
+    previews.push({
+      key: dedupeKey,
+      label,
+      imageId: ingredient.imageId
+    });
+
+    if (previews.length >= 4) {
+      break;
+    }
+  }
+
+  return previews;
+}
+
 async function toggleFavorite(recipe: Recipe): Promise<void> {
   clearMessages();
   try {
@@ -994,7 +1043,22 @@ onMounted(async () => {
             {{ formatRecipeTime(recipe) }}
           </template>
           <template #content>
-            <p class="recipe-card-meta">{{ recipe.ingredients.length }} ingrédients · {{ recipe.steps.length }} étapes</p>
+            <div class="recipe-card-meta-row">
+              <p class="recipe-card-meta">
+                {{ recipe.ingredients.length }} ingrédients · {{ recipe.steps.length }} étapes
+              </p>
+              <div class="recipe-card-ingredient-icons" aria-hidden="true">
+                <IngredientImage
+                  v-for="ingredientPreview in ingredientPreviewForCard(recipe)"
+                  :key="ingredientPreview.key"
+                  :label="ingredientPreview.label"
+                  :image-id="ingredientPreview.imageId"
+                  img-class="ingredient-icon ingredient-icon--card"
+                  fallback-class="ingredient-icon ingredient-icon--card"
+                  :alt="`Ingrédient ${ingredientPreview.label}`"
+                />
+              </div>
+            </div>
           </template>
         </Card>
 
@@ -1178,11 +1242,20 @@ onMounted(async () => {
       </div>
 
       <h3>Ingrédients</h3>
-      <ul>
-        <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
-          <strong>{{ ingredient.label }}</strong>
-          <span v-if="ingredient.quantity !== undefined">
-            : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+      <ul class="ingredient-list">
+        <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id" class="ingredient-line">
+          <IngredientImage
+            :label="ingredient.label"
+            :image-id="ingredient.imageId"
+            img-class="ingredient-icon ingredient-icon--detail"
+            fallback-class="ingredient-icon ingredient-icon--detail"
+            :alt="`Ingrédient ${ingredient.label}`"
+          />
+          <span class="ingredient-line-text">
+            <strong>{{ ingredient.label }}</strong>
+            <span v-if="ingredient.quantity !== undefined">
+              : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+            </span>
           </span>
         </li>
       </ul>

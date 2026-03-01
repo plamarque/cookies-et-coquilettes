@@ -8,6 +8,7 @@ export interface IngredientLine {
   unit?: string;
   isScalable: boolean;
   rawText?: string;
+  imageId?: string;
 }
 
 export interface ImportSource {
