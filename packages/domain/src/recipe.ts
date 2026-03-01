@@ -9,6 +9,7 @@ export interface IngredientLine {
   unit?: string;
   isScalable: boolean;
   rawText?: string;
+  imageId?: string;
 }
 
 export interface InstructionStep {
@@ -41,6 +42,15 @@ export interface Recipe {
 }
 
 export interface RecipeImage {
+  id: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface IngredientImage {
   id: string;
   mimeType: string;
   width?: number;

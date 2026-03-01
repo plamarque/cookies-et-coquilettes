@@ -78,6 +78,28 @@ test.describe("Cookies & Coquillettes v1", () => {
     await expect(page.locator("section.panel.detail, section.panel.form-panel")).toBeVisible();
   });
 
+  test("images ingrédient : icône visible sur détail et carte", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Nouvelle recette" }).click();
+    await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
+    await page.getByRole("button", { name: "Saisir à la main" }).click();
+    await page.getByLabel("Titre").fill("Recette images ingrédient");
+    await page.getByLabel(/ingredient-label-/).first().fill("Farine");
+    await page.getByLabel(/ingredient-quantity-/).first().fill("200");
+    await page.getByLabel(/ingredient-unit-/).first().fill("g");
+    await page.getByLabel(/step-text-/).first().fill("Mélanger");
+    await saveRecipeForm(page);
+
+    await expect(page.getByRole("heading", { name: "Recette images ingrédient" })).toBeVisible();
+    await expect(page.locator(".ingredient-line .ingredient-icon--detail").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Retour" }).click();
+    const recipeCard = page.locator(".recipe-card", {
+      hasText: "Recette images ingrédient"
+    }).first();
+    await expect(recipeCard.locator(".recipe-card-ingredient-icons .ingredient-icon--card").first()).toBeVisible();
+  });
+
   test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
     page
   }) => {
