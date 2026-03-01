@@ -3,6 +3,7 @@ export type ImportType = "MANUAL" | "SHARE" | "URL" | "SCREENSHOT" | "TEXT";
 
 export interface IngredientLine {
   id: string;
+  order?: number;
   label: string;
   quantity?: number;
   quantityBase?: number;

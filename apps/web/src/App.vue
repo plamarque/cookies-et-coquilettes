@@ -140,15 +140,17 @@ function toForm(recipe: Recipe): RecipeFormState {
     cookTimeMin: recipe.cookTimeMin ? String(recipe.cookTimeMin) : "",
     ingredients:
       recipe.ingredients.length > 0
-        ? recipe.ingredients.map((ingredient) => ({
-            id: ingredient.id,
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable,
-            imageId: ingredient.imageId
-          }))
+        ? [...recipe.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id,
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       recipe.steps.length > 0
@@ -173,15 +175,17 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
     imageId: undefined,
     ingredients:
       draft.ingredients.length > 0
-        ? draft.ingredients.map((ingredient) => ({
-            id: ingredient.id || randomId(),
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable,
-            imageId: ingredient.imageId
-          }))
+        ? [...draft.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id || randomId(),
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       draft.steps.length > 0
@@ -236,7 +240,7 @@ function formToRecipe(existing?: Recipe): Recipe {
       }
     : existing?.source;
   const ingredients = form.value.ingredients
-    .map((ingredient) => {
+    .map((ingredient, index) => {
       const label = ingredient.label.trim();
       const quantity = parseNumber(ingredient.quantity);
       if (!label) {
@@ -245,6 +249,7 @@ function formToRecipe(existing?: Recipe): Recipe {
 
       return {
         id: ingredient.id,
+        order: index + 1,
         label,
         quantity,
         quantityBase: ingredient.isScalable ? quantity : undefined,
@@ -301,6 +306,12 @@ function formToRecipe(existing?: Recipe): Recipe {
 const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
+
+const selectedRecipeIngredientsSorted = computed(() => {
+  const recipe = selectedRecipe.value;
+  if (!recipe?.ingredients.length) return [];
+  return [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+});
 
 const favoriteCount = computed(() =>
   recipes.value.filter((recipe) => recipe.favorite).length
@@ -759,8 +770,9 @@ function ingredientPreviewForCard(
 ): Array<{ key: string; label: string; imageId?: string }> {
   const previews: Array<{ key: string; label: string; imageId?: string }> = [];
   const seen = new Set<string>();
+  const sorted = [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  for (const ingredient of recipe.ingredients) {
+  for (const ingredient of sorted) {
     const label = ingredient.label.trim();
     if (!label) {
       continue;
@@ -1115,7 +1127,7 @@ onMounted(async () => {
 
       <h3>Ingrédients</h3>
       <ul class="ingredient-list">
-        <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id" class="ingredient-line">
+        <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id" class="ingredient-line">
           <IngredientImage
             :label="ingredient.label"
             :image-id="ingredient.imageId"
