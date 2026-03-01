@@ -72,6 +72,7 @@ Règles de contrat :
 
 - `startCookingMode()`
 - `stopCookingMode()`
+- Le calcul de durée de session et la proposition d’ajustement de `prepTimeMin` (moyenne avec la valeur existante) sont gérés côté `App.vue` lors de l’arrêt.
 
 ## Données et persistance
 
