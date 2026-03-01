@@ -405,6 +405,21 @@ function toDraftFromLlmPayload(
   };
 }
 
+function withSourceType(
+  draft: ParsedRecipeDraft,
+  sourceType: ImportType,
+  url?: string
+): ParsedRecipeDraft {
+  return {
+    ...draft,
+    source: {
+      type: sourceType,
+      url: url?.trim() || undefined,
+      capturedAt: draft.source?.capturedAt ?? new Date().toISOString()
+    }
+  };
+}
+
 async function parseWithOpenAI(
   text: string,
   imageUrl: string | undefined,
@@ -593,9 +608,37 @@ export async function parseRecipeWithCloud(
   }
 
   if (sourceType === "SHARE") {
+    if (url) {
+      try {
+        const html = await fetchUrl(url);
+        const jsonLdDraft = extractRecipeFromJsonLd(html, url);
+        const ogImage = extractOgImage(html, url);
+
+        if (jsonLdDraft && jsonLdDraft.ingredients.length + jsonLdDraft.steps.length > 0) {
+          const twicImage = extractTwicPicsImage(html, jsonLdDraft.imageUrl);
+          if (ogImage) {
+            jsonLdDraft.imageUrl = ogImage;
+          } else if (twicImage) {
+            jsonLdDraft.imageUrl = twicImage;
+          }
+          return withSourceType(jsonLdDraft, sourceType, url);
+        }
+
+        const mergedText = [input.shareTitle, input.text, extractMainText(html)]
+          .filter((chunk): chunk is string => Boolean(chunk?.trim()))
+          .join("\n\n");
+        const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
+        if (hasOpenAiKey && mergedText.length > 100) {
+          return parseWithOpenAI(mergedText, ogImage, url, sourceType);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("SHARE import URL extraction error", err);
+      }
+    }
+
     const text = input.text ?? input.shareTitle ?? "";
-    const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
-    if (hasOpenAiKey && text.length > 50) {
+    if (Boolean(process.env.OPENAI_API_KEY) && text.length > 50) {
       return parseWithOpenAI(text, undefined, url, sourceType);
     }
     return fallbackDraft(input.shareTitle ?? "Recette partagée", sourceType, url);
