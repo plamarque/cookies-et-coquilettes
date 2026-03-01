@@ -1467,6 +1467,9 @@ onUnmounted(() => {
 
           <template v-if="currentCookingStep">
             <div class="cooking-step-body">
+              <div class="cooking-step-text-scroll">
+                <p class="cooking-step-text cooking-step-text--fullscreen">{{ currentCookingStep.text }}</p>
+              </div>
               <div class="cooking-step-ingredients-row" aria-label="Ingrédients mentionnés dans l'étape">
                 <div class="cooking-step-ingredients-icons">
                   <template v-if="currentStepMentionedIngredients.length > 0">
@@ -1501,10 +1504,6 @@ onUnmounted(() => {
                 >
                   {{ showCookingIngredients ? "Masquer" : "Voir tous" }}
                 </button>
-              </div>
-
-              <div class="cooking-step-text-scroll">
-                <p class="cooking-step-text cooking-step-text--fullscreen">{{ currentCookingStep.text }}</p>
               </div>
               <ul v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
                 <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id">

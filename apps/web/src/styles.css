@@ -544,8 +544,8 @@ body {
 }
 
 .ingredient-icon--cooking-step {
-  width: 1.85rem;
-  height: 1.85rem;
+  width: 2.2rem;
+  height: 2.2rem;
 }
 
 .cooking-step-ingredients-empty {
@@ -864,8 +864,8 @@ body {
   }
 
   .ingredient-icon--cooking-step {
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 2rem;
+    height: 2rem;
   }
 
   .cooking-step-see-all {
