@@ -62,7 +62,8 @@ Règles de contrat :
 - flux direct : `parse -> create -> détail` ; image en arrière-plan si absente,
 - l’UI expose un état de progression pendant l’import (analyse URL/texte, lecture image),
 - la `source` d’import est persistée avec `type + capturedAt` même quand `url` est absente,
-- en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
+- en indisponibilité BFF/parsing, retour d’un draft fallback éditable,
+- pour une source Instagram sans image locale, l’UI affiche un embed `post/reel` basé sur l’URL source.
 
 ### Cooking mode service
 
