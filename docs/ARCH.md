@@ -28,6 +28,7 @@ Définir l’architecture cible de **Cookies & Coquillettes** en PWA Vue/TypeScr
 | `app-shell` | Initialisation Vue/PWA/PrimeVue | `apps/web/src/main.ts` |
 | `recipe-service` | CRUD recettes, favoris, portions | `apps/web/src/services/recipe-service.ts` |
 | `import-service` | Import URL/share/screenshot/texte + appel BFF | `apps/web/src/services/import-service.ts` |
+| `share-target-service` | Lecture/nettoyage des paramètres `share_target` au démarrage | `apps/web/src/services/share-target-service.ts` |
 | `cooking-mode-service` | Wake Lock + fallback navigateur | `apps/web/src/services/cooking-mode-service.ts` |
 | `db` | Schéma IndexedDB et accès tables | `apps/web/src/storage/db.ts` |
 | `ingredient-image-service` | Résolution d'image ingrédient (cache local, génération IA), stockage | `apps/web/src/services/ingredient-image-service.ts` |
@@ -61,8 +62,10 @@ Règles de contrat :
 Règles de contrat :
 - flux direct : `parse -> create -> détail` ; image en arrière-plan si absente,
 - l’UI expose un état de progression pendant l’import (analyse URL/texte, lecture image),
+- pour un payload `SHARE` contenant une URL, priorité à l’extraction depuis l’URL partagée,
 - la `source` d’import est persistée avec `type + capturedAt` même quand `url` est absente,
-- en indisponibilité BFF/parsing, retour d’un draft fallback éditable.
+- en indisponibilité BFF/parsing, retour d’un draft fallback éditable,
+- pour une source Instagram sans image locale, l’UI affiche un embed `post/reel` basé sur l’URL source.
 
 ### Cooking mode service
 
@@ -98,15 +101,16 @@ Index minimaux :
 4. Le front crée la recette immédiatement et affiche le détail ; l'image est traitée en arrière-plan si absente.
 5. En cas d’échec partiel ou BFF indisponible, le front et/ou le BFF renvoient un draft fallback minimal.
 
-### Stratégie de parsing (import URL pages web)
+### Stratégie de parsing (import URL pages web et Instagram)
 
 Ordre de priorité côté BFF :
 
-1. **JSON-LD Schema.org** — si la page contient un bloc `application/ld+json` de type `Recipe`, extraction directe (titre, ingrédients, étapes, image, portions, temps).
-2. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
-3. **Fallback** — draft minimal éditable.
+1. **Scraper Instagram (`instagram-url-direct`)** — pour les URLs `instagram.com` (post/reel/tv), extraction de la caption + médias du post ; le texte est ensuite envoyé au parseur LLM, sinon fallback enrichi.
+2. **JSON-LD Schema.org** — si la page contient un bloc `application/ld+json` de type `Recipe`, extraction directe (titre, ingrédients, étapes, image, portions, temps).
+3. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
+4. **Fallback** — draft minimal éditable.
 
-L'image est extraite via le champ `image` du JSON-LD ou via la balise `og:image`. Le front télécharge l'image à la sauvegarde et la stocke dans IndexedDB.
+L'image est extraite via le scraper Instagram (URLs Instagram), sinon via le champ `image` du JSON-LD ou la balise `og:image`. Le front télécharge l'image à la sauvegarde et la stocke dans IndexedDB.
 
 **Génération automatique** : lorsqu'aucune image n'est extraite, le BFF peut générer une image via une API IA (ex. DALL-E) à partir du titre, des ingrédients et des étapes. Style : photo de plat type Instagram, flat lay, élégant. Le front affiche un placeholder pendant la génération ; une fois l'URL reçue, l'image est téléchargée et stockée localement.
 
@@ -150,8 +154,10 @@ Le BFF charge `.env` à la racine du projet (dotenv) pour `OPENAI_API_KEY`. L’
    - utiliser `navigator.wakeLock` si disponible,
    - fallback visuel/instructionnel sinon.
 2. Share Target :
-   - activer dans le manifest PWA,
-   - conserver une entrée manuelle URL/texte/screenshot pour tous les navigateurs.
+   - activer dans le manifest PWA (`share_target`) avec réception de payload URL/texte/titre,
+   - support principal : Chromium (Android/desktop) avec PWA installée,
+   - non supporté nativement sur Safari (iOS/macOS) ni Firefox,
+   - conserver un fallback manuel universel : collage URL/texte/image + lecture presse-papiers.
 
 ## Arborescence cible
 

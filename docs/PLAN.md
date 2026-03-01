@@ -16,9 +16,11 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | F | Mode cuisine Wake Lock + fallback non bloquant | En cours |
 | G | Durcissement release v1 (tests smoke E2E + cohérence erreurs/docs) | En cours |
 | H | Import URL — pages web (fetch, JSON-LD, OpenAI, spinner, image) | Fait |
-| I | Import URL — Instagram (scraper open-source) | Différée |
+| I | Import URL — Instagram (scraper open-source) | Fait |
 | J | Images recettes : génération IA automatique (fallback si pas d'extraction), placeholder | En cours |
 | K | Ajustement portions : recalcul quantités (UI masquée, implémentation à finaliser) | Différée |
+| L | Cible de partage PWA (`share_target`) + fallback presse-papiers multi-plateforme | Fait |
+| M | Images ingrédients : icônes détail + cartes, génération IA lazy, cache IndexedDB mutualisé | Fait |
 
 ## Definition of Done par slice
 

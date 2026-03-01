@@ -94,6 +94,53 @@ body {
   color: #3e4b46;
 }
 
+.recipe-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.recipe-card-ingredient-icons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.ingredient-icon {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  background: rgba(31, 79, 70, 0.08);
+}
+
+.ingredient-icon--card {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.ingredient-icon--detail {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.ingredient-image-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(31, 79, 70, 0.55);
+  font-size: 0.65rem;
+}
+
+.ingredient-image-fallback--loading {
+  color: rgba(31, 79, 70, 0.32);
+}
+
 .recipe-detail-header {
   position: relative;
   width: 100%;
@@ -121,6 +168,23 @@ body {
   justify-content: center;
   color: rgba(31, 79, 70, 0.6);
   font-size: 0.9rem;
+}
+
+.recipe-detail-embed-wrapper {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(31, 79, 70, 0.15);
+  background: #fff;
+}
+
+.recipe-detail-instagram-embed {
+  width: 100%;
+  min-height: 360px;
+  border: none;
+  display: block;
 }
 
 .recipe-detail-header-actions {
@@ -493,6 +557,25 @@ body {
   font-size: 0.9rem;
 }
 
+.recipe-form-media-fallback {
+  gap: 0.5rem;
+}
+
+.recipe-form-embed-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recipe-form-instagram-embed {
+  width: 100%;
+  max-width: 420px;
+  min-height: 360px;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
 .empty-card {
   border: 1px dashed rgba(31, 79, 70, 0.45);
 }
@@ -731,6 +814,28 @@ body {
   color: #3e4b46;
 }
 
+.share-target-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  background: rgba(31, 79, 70, 0.05);
+  color: #2f4d45;
+}
+
+.share-target-hint i {
+  margin-top: 0.15rem;
+}
+
+.share-target-hint p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
 .add-choice-buttons {
   display: flex;
   gap: 0.75rem;
@@ -876,6 +981,26 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 1rem 0;
+}
+
+.ingredient-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ingredient-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.ingredient-line-text {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: baseline;
+  flex-wrap: wrap;
 }
 
 input,

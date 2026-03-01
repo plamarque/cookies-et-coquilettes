@@ -8,19 +8,26 @@ import type {
   ParsedRecipeDraft,
   Recipe,
   RecipeCategory,
-  RecipeFilters
+  RecipeFilters,
+  ShareImportPayload
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
+import IngredientImage from "./components/IngredientImage.vue";
 import { seedIfEmpty } from "./seed/seed-if-empty";
 import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService, generateRecipeImage } from "./services/import-service";
+import { buildInstagramEmbedUrl } from "./utils/instagram-embed";
+import {
+  clearShareImportParamsFromWindowLocation,
+  readShareImportPayloadFromWindow
+} from "./services/share-target-service";
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT";
-type ImportProgressType = "url" | "text" | "screenshot" | "file";
+type ImportProgressType = "url" | "text" | "screenshot" | "file" | "share";
 
 interface IngredientInput {
   id: string;
@@ -28,6 +35,7 @@ interface IngredientInput {
   quantity: string;
   unit: string;
   isScalable: boolean;
+  imageId?: string;
 }
 
 interface StepInput {
@@ -76,6 +84,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const formImageInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
+const clipboardBusy = ref(false);
 const importSourceType = ref<ImportProgressType | null>(null);
 const imageGenerating = ref(false);
 const imageReextracting = ref(false);
@@ -205,14 +214,17 @@ function toForm(recipe: Recipe): RecipeFormState {
     cookTimeMin: recipe.cookTimeMin ? String(recipe.cookTimeMin) : "",
     ingredients:
       recipe.ingredients.length > 0
-        ? recipe.ingredients.map((ingredient) => ({
-            id: ingredient.id,
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable
-          }))
+        ? [...recipe.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id,
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       recipe.steps.length > 0
@@ -237,14 +249,17 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
     imageId: undefined,
     ingredients:
       draft.ingredients.length > 0
-        ? draft.ingredients.map((ingredient) => ({
-            id: ingredient.id || randomId(),
-            label: ingredient.label,
-            quantity:
-              ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
-            unit: ingredient.unit ?? "",
-            isScalable: ingredient.isScalable
-          }))
+        ? [...draft.ingredients]
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((ingredient) => ({
+              id: ingredient.id || randomId(),
+              label: ingredient.label,
+              quantity:
+                ingredient.quantity !== undefined ? String(ingredient.quantity) : "",
+              unit: ingredient.unit ?? "",
+              isScalable: ingredient.isScalable,
+              imageId: ingredient.imageId
+            }))
         : [emptyIngredient()],
     steps:
       draft.steps.length > 0
@@ -275,6 +290,8 @@ function sourceTypeLabel(source?: ImportSource): string {
 
 function importBusyLabel(type: ImportProgressType | null): string {
   switch (type) {
+    case "share":
+      return "Analyse du partage en cours…";
     case "url":
       return "Analyse de l'URL en cours…";
     case "text":
@@ -288,6 +305,9 @@ function importBusyLabel(type: ImportProgressType | null): string {
   }
 }
 
+const shareTargetSupportHint =
+  "Le partage natif vers la PWA fonctionne surtout sur Android (Chrome/Edge, app installée). Sur iOS/Safari et Firefox, copiez l'URL puis utilisez le fallback ci-dessous.";
+
 function formToRecipe(existing?: Recipe): Recipe {
   const now = new Date().toISOString();
   const servingsBase = parseNumber(form.value.servingsBase);
@@ -299,7 +319,7 @@ function formToRecipe(existing?: Recipe): Recipe {
       }
     : existing?.source;
   const ingredients = form.value.ingredients
-    .map((ingredient) => {
+    .map((ingredient, index) => {
       const label = ingredient.label.trim();
       const quantity = parseNumber(ingredient.quantity);
       if (!label) {
@@ -308,12 +328,14 @@ function formToRecipe(existing?: Recipe): Recipe {
 
       return {
         id: ingredient.id,
+        order: index + 1,
         label,
         quantity,
         quantityBase: ingredient.isScalable ? quantity : undefined,
         unit: ingredient.unit.trim() || undefined,
         isScalable: ingredient.isScalable,
-        rawText: label
+        rawText: label,
+        imageId: ingredient.imageId
       };
     })
     .filter((ingredient): ingredient is NonNullable<typeof ingredient> => ingredient !== null);
@@ -403,7 +425,19 @@ const currentStepMentionedIngredients = computed(() => {
     stepMentionsIngredient(normalizedStepText, ingredient.label)
   );
 });
+const selectedRecipeIngredientsSorted = computed(() => {
+  const recipe = selectedRecipe.value;
+  if (!recipe?.ingredients.length) return [];
+  return [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+});
 
+const selectedRecipeInstagramEmbedUrl = computed(() =>
+  buildInstagramEmbedUrl(selectedRecipe.value?.source?.url)
+);
+
+const formInstagramEmbedUrl = computed(() =>
+  buildInstagramEmbedUrl(form.value.source?.url)
+);
 const favoriteCount = computed(() =>
   recipes.value.filter((recipe) => recipe.favorite).length
 );
@@ -464,6 +498,60 @@ function isLikelyUrl(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+async function runImportFromSharePayload(payload: ShareImportPayload): Promise<void> {
+  clearMessages();
+  importBusy.value = true;
+  importSourceType.value = "share";
+  viewMode.value = "ADD_CHOICE";
+  try {
+    const draft = await bffImportService.importFromShare(payload);
+    await createRecipeFromDraft(draft);
+  } catch (error) {
+    if (payload.url || payload.text) {
+      pasteFieldContent.value = payload.url ?? payload.text ?? "";
+    }
+    setError(error);
+  } finally {
+    importBusy.value = false;
+    importSourceType.value = null;
+  }
+}
+
+async function importFromClipboardFallback(): Promise<void> {
+  clearMessages();
+  if (!navigator.clipboard?.readText) {
+    setError(
+      new Error("Lecture du presse-papiers non supportée ici. Collez manuellement dans le champ.")
+    );
+    return;
+  }
+
+  clipboardBusy.value = true;
+  try {
+    const content = (await navigator.clipboard.readText()).trim();
+    if (!content) {
+      throw new Error("Le presse-papiers est vide.");
+    }
+    pasteFieldContent.value = content;
+    feedback.value = "Contenu du presse-papiers collé. Vous pouvez lancer l'import.";
+  } catch (error) {
+    setError(error);
+  } finally {
+    clipboardBusy.value = false;
+  }
+}
+
+async function consumeShareTargetPayloadFromUrl(): Promise<void> {
+  const payload = readShareImportPayloadFromWindow();
+  if (!payload) {
+    return;
+  }
+
+  // Clear query params early to avoid duplicate import on refresh/back navigation.
+  clearShareImportParamsFromWindowLocation();
+  await runImportFromSharePayload(payload);
 }
 
 async function runImportFromPasteField(): Promise<void> {
@@ -612,6 +700,9 @@ function fallbackImportMessage(source?: ImportSource): string {
     case "SHARE":
       return "L'extraction du partage a échoué. Complétez manuellement la recette.";
     case "URL":
+      if (buildInstagramEmbedUrl(source.url)) {
+        return "L'extraction du post Instagram est incomplète. Complétez manuellement la recette ; l'aperçu du post/reel reste affiché.";
+      }
       return "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
     default:
       return "L'extraction a échoué. Complétez manuellement la recette.";
@@ -923,6 +1014,39 @@ function formatRecipeTime(recipe: Recipe): string {
   return "";
 }
 
+function ingredientPreviewForCard(
+  recipe: Recipe
+): Array<{ key: string; label: string; imageId?: string }> {
+  const previews: Array<{ key: string; label: string; imageId?: string }> = [];
+  const seen = new Set<string>();
+  const sorted = [...recipe.ingredients].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const ingredient of sorted) {
+    const label = ingredient.label.trim();
+    if (!label) {
+      continue;
+    }
+
+    const dedupeKey = ingredient.imageId?.trim() || label.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+
+    previews.push({
+      key: dedupeKey,
+      label,
+      imageId: ingredient.imageId
+    });
+
+    if (previews.length >= 4) {
+      break;
+    }
+  }
+
+  return previews;
+}
+
 async function toggleFavorite(recipe: Recipe): Promise<void> {
   clearMessages();
   try {
@@ -998,6 +1122,7 @@ async function toggleCookingMode(): Promise<void> {
 onMounted(async () => {
   await seedIfEmpty();
   await refresh();
+  await consumeShareTargetPayloadFromUrl();
 });
 
 onUnmounted(() => {
@@ -1099,7 +1224,22 @@ onUnmounted(() => {
             {{ formatRecipeTime(recipe) }}
           </template>
           <template #content>
-            <p class="recipe-card-meta">{{ recipe.ingredients.length }} ingrédients · {{ recipe.steps.length }} étapes</p>
+            <div class="recipe-card-meta-row">
+              <p class="recipe-card-meta">
+                {{ recipe.ingredients.length }} ingrédients · {{ recipe.steps.length }} étapes
+              </p>
+              <div class="recipe-card-ingredient-icons" aria-hidden="true">
+                <IngredientImage
+                  v-for="ingredientPreview in ingredientPreviewForCard(recipe)"
+                  :key="ingredientPreview.key"
+                  :label="ingredientPreview.label"
+                  :image-id="ingredientPreview.imageId"
+                  img-class="ingredient-icon ingredient-icon--card"
+                  fallback-class="ingredient-icon ingredient-icon--card"
+                  :alt="`Ingrédient ${ingredientPreview.label}`"
+                />
+              </div>
+            </div>
           </template>
         </Card>
 
@@ -1127,6 +1267,11 @@ onUnmounted(() => {
         <p>{{ importBusyLabel(importSourceType) }}</p>
       </div>
 
+      <div class="share-target-hint">
+        <i class="pi pi-share-alt" />
+        <p>{{ shareTargetSupportHint }}</p>
+      </div>
+
       <div class="stack">
         <label for="paste-field">Collez une URL, du texte ou une image</label>
         <textarea
@@ -1140,8 +1285,16 @@ onUnmounted(() => {
         <Button
           label="Importer"
           icon="pi pi-download"
-          :disabled="importBusy || !pasteFieldContent.trim()"
+          :disabled="importBusy || clipboardBusy || !pasteFieldContent.trim()"
           @click="runImportFromPasteField"
+        />
+        <Button
+          label="Coller depuis le presse-papiers"
+          icon="pi pi-clipboard"
+          severity="secondary"
+          :loading="clipboardBusy"
+          :disabled="importBusy"
+          @click="importFromClipboardFallback"
         />
       </div>
 
@@ -1303,6 +1456,16 @@ onUnmounted(() => {
         >
           {{ imageLoadingMessage }}
         </div>
+        <div v-else-if="selectedRecipeInstagramEmbedUrl" class="recipe-detail-embed-wrapper">
+          <iframe
+            :src="selectedRecipeInstagramEmbedUrl"
+            title="Aperçu Instagram"
+            class="recipe-detail-instagram-embed"
+            loading="lazy"
+            allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+            allowfullscreen
+          />
+        </div>
         <div v-else class="recipe-detail-image-placeholder" />
         <div class="recipe-detail-header-actions">
           <Button
@@ -1382,11 +1545,20 @@ onUnmounted(() => {
       </div>
 
       <h3>Ingrédients</h3>
-      <ul>
-        <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
-          <strong>{{ ingredient.label }}</strong>
-          <span v-if="ingredient.quantity !== undefined">
-            : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+      <ul class="ingredient-list">
+        <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id" class="ingredient-line">
+          <IngredientImage
+            :label="ingredient.label"
+            :image-id="ingredient.imageId"
+            img-class="ingredient-icon ingredient-icon--detail"
+            fallback-class="ingredient-icon ingredient-icon--detail"
+            :alt="`Ingrédient ${ingredient.label}`"
+          />
+          <span class="ingredient-line-text">
+            <strong>{{ ingredient.label }}</strong>
+            <span v-if="ingredient.quantity !== undefined">
+              : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+            </span>
           </span>
         </li>
       </ul>
@@ -1486,22 +1658,35 @@ onUnmounted(() => {
           <ProgressSpinner style="width: 2rem; height: 2rem" strokeWidth="4" />
           <span>{{ imageReextracting ? "Extraction de la recette en cours…" : "Génération de l'image en cours…" }}</span>
         </div>
-        <div v-else class="row" style="gap: 0.5rem; flex-wrap: wrap">
-          <Button
-            text
-            size="small"
-            icon="pi pi-image"
-            label="Ajouter une image"
-            @click="triggerFormImagePick"
-          />
-          <Button
-            text
-            size="small"
-            icon="pi pi-sparkles"
-            label="Générer une image"
-            :loading="imageGenerating"
-            @click="triggerImageGeneration"
-          />
+        <div v-else class="stack recipe-form-media-fallback">
+          <div v-if="formInstagramEmbedUrl" class="recipe-form-embed-wrapper">
+            <iframe
+              :src="formInstagramEmbedUrl"
+              title="Aperçu Instagram"
+              class="recipe-form-instagram-embed"
+              loading="lazy"
+              allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+              allowfullscreen
+            />
+            <small class="muted">Aperçu du post/reel Instagram importé.</small>
+          </div>
+          <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
+            <Button
+              text
+              size="small"
+              icon="pi pi-image"
+              label="Ajouter une image"
+              @click="triggerFormImagePick"
+            />
+            <Button
+              text
+              size="small"
+              icon="pi pi-sparkles"
+              label="Générer une image"
+              :loading="imageGenerating"
+              @click="triggerImageGeneration"
+            />
+          </div>
         </div>
         <input
           ref="formImageInputRef"

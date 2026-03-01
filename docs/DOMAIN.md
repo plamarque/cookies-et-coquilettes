@@ -37,6 +37,7 @@ Ligne d’ingrédient affichée et exploitable pour le recalcul des portions.
 
 Attributs principaux :
 - `id`
+- `order` (optionnel, ordre d'affichage ; à défaut, l'ordre du tableau fait foi)
 - `label` (nom lisible)
 - `quantity` (optionnelle, valeur affichée courante)
 - `quantityBase` (optionnelle, référence immuable pour scaling)

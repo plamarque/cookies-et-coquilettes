@@ -5,7 +5,7 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { extractImageFromUrl, parseRecipeWithCloud } from "./parsing-client.js";
-import { generateRecipeImage } from "./image-generator.js";
+import { generateIngredientImage, generateRecipeImage } from "./image-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
@@ -137,6 +137,22 @@ app.post("/api/generate-recipe-image", async (req, res) => {
 
   if (!imageUrl) {
     res.status(503).json({ error: "Image generation unavailable" });
+    return;
+  }
+
+  res.json({ imageUrl });
+});
+
+app.post("/api/generate-ingredient-image", async (req, res) => {
+  const label = req.body?.label as string | undefined;
+  if (!label?.trim()) {
+    res.status(400).json({ error: "label is required" });
+    return;
+  }
+
+  const imageUrl = await generateIngredientImage({ label: label.trim() });
+  if (!imageUrl) {
+    res.status(503).json({ error: "Ingredient image generation unavailable" });
     return;
   }
 
