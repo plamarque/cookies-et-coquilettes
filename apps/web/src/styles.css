@@ -474,7 +474,7 @@ body {
 
 .cooking-step-timer {
   position: absolute;
-  left: 0.65rem;
+  right: 0.65rem;
   top: 0.65rem;
   z-index: 2;
   display: flex;
@@ -485,8 +485,9 @@ body {
   border-radius: 0.85rem;
   background: rgba(16, 22, 20, 0.5);
   color: #fff;
-  backdrop-filter: blur(2.5px);
   box-shadow: 0 5px 16px rgba(0, 0, 0, 0.18);
+  isolation: isolate;
+  contain: layout paint;
 }
 
 .cooking-step-timer-visual {
@@ -497,6 +498,7 @@ body {
   position: relative;
   display: grid;
   place-items: center;
+  will-change: background;
   background:
     conic-gradient(
       from -90deg,
@@ -536,14 +538,28 @@ body {
 
 .cooking-step-timer-actions {
   display: flex;
-  gap: 0.3rem;
+  gap: 0.24rem;
 }
 
 .cooking-step-timer-action.p-button {
-  min-height: 1.8rem;
+  width: 1.95rem;
+  min-width: 1.95rem;
+  height: 1.95rem;
+  min-height: 1.95rem;
   border-radius: 999px !important;
   font-size: 0.72rem !important;
-  padding: 0.2rem 0.52rem !important;
+  padding: 0 !important;
+}
+
+.cooking-step-timer-action .p-button-icon {
+  margin-right: 0 !important;
+  font-size: 0.82rem;
+}
+
+.cooking-step-timer-action--primary.p-button {
+  background: rgba(31, 79, 70, 0.9) !important;
+  border-color: rgba(31, 79, 70, 0.9) !important;
+  color: #fff !important;
 }
 
 .cooking-step-timer-action--reset.p-button {
@@ -945,7 +961,7 @@ body {
   }
 
   .cooking-step-timer {
-    left: 0.45rem;
+    right: 0.45rem;
     top: 0.45rem;
     gap: 0.25rem;
     padding: 0.34rem;
@@ -970,9 +986,12 @@ body {
   }
 
   .cooking-step-timer-action.p-button {
-    min-height: 1.55rem;
+    width: 1.72rem;
+    min-width: 1.72rem;
+    height: 1.72rem;
+    min-height: 1.72rem;
     font-size: 0.64rem !important;
-    padding: 0.14rem 0.38rem !important;
+    padding: 0 !important;
   }
 
   .cooking-media-ingredients-overlay {

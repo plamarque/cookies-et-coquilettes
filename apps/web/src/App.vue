@@ -25,6 +25,7 @@ import {
   getCookingStepImageBlobUrl,
   resolveCookingStepImageId
 } from "./services/cooking-step-image-service";
+import { detectStepTimerDurationSeconds } from "./services/step-timer-service";
 import { buildInstagramEmbedUrl } from "./utils/instagram-embed";
 import { extractStepTimerDurationSeconds } from "./utils/step-timer";
 import {
@@ -111,6 +112,7 @@ const stepTimerRunning = ref(false);
 const stepTimerFinished = ref(false);
 let stepTimerIntervalId: ReturnType<typeof setInterval> | null = null;
 let stepTimerEndAt = 0;
+let stepTimerDetectionCounter = 0;
 
 const selectedIngredientForModal = ref<IngredientLine | null>(null);
 const ingredientModalVisible = ref(false);
@@ -504,10 +506,6 @@ const currentCookingStep = computed(() => {
   return steps[normalizedCookingStepIndex.value];
 });
 
-const currentCookingStepTimerSeconds = computed(() =>
-  extractStepTimerDurationSeconds(currentCookingStep.value?.text)
-);
-
 const hasCurrentStepTimer = computed(
   () => stepTimerTotalSeconds.value !== null && stepTimerTotalSeconds.value > 0
 );
@@ -588,9 +586,8 @@ function syncStepTimerFromClock(): void {
   playStepTimerFinishedSignal();
 }
 
-function prepareStepTimerForCurrentStep(): void {
+function applyStepTimerSuggestion(suggestedSeconds: number | undefined): void {
   clearStepTimerInterval();
-  const suggestedSeconds = currentCookingStepTimerSeconds.value;
   if (!suggestedSeconds) {
     stepTimerTotalSeconds.value = null;
     stepTimerRemainingSeconds.value = 0;
@@ -600,6 +597,49 @@ function prepareStepTimerForCurrentStep(): void {
   stepTimerTotalSeconds.value = suggestedSeconds;
   stepTimerRemainingSeconds.value = suggestedSeconds;
   stepTimerFinished.value = false;
+}
+
+async function detectCurrentStepTimerSuggestion(): Promise<void> {
+  const detectionId = ++stepTimerDetectionCounter;
+  const step = currentCookingStep.value;
+  if (cookingState.value === "OFF" || !step) {
+    applyStepTimerSuggestion(undefined);
+    return;
+  }
+
+  const stepText = step.text.trim();
+  if (!stepText) {
+    applyStepTimerSuggestion(undefined);
+    return;
+  }
+
+  const localSuggestion = extractStepTimerDurationSeconds(stepText);
+  applyStepTimerSuggestion(localSuggestion);
+
+  const semanticSuggestion = await detectStepTimerDurationSeconds(stepText);
+  if (detectionId !== stepTimerDetectionCounter) {
+    return;
+  }
+
+  const activeStep = currentCookingStep.value;
+  if (!activeStep || activeStep.id !== step.id) {
+    return;
+  }
+
+  if (semanticSuggestion === localSuggestion) {
+    return;
+  }
+
+  const timerUntouched =
+    !stepTimerRunning.value &&
+    !stepTimerFinished.value &&
+    (stepTimerTotalSeconds.value === null ||
+      stepTimerRemainingSeconds.value === stepTimerTotalSeconds.value);
+  if (!timerUntouched) {
+    return;
+  }
+
+  applyStepTimerSuggestion(semanticSuggestion);
 }
 
 function startStepTimer(): void {
@@ -616,7 +656,7 @@ function startStepTimer(): void {
   if (!stepTimerRunning.value) {
     return;
   }
-  stepTimerIntervalId = setInterval(syncStepTimerFromClock, 250);
+  stepTimerIntervalId = setInterval(syncStepTimerFromClock, 1000);
 }
 
 function pauseStepTimer(): void {
@@ -949,13 +989,11 @@ watch(
   ],
   () => {
     if (cookingState.value === "OFF") {
-      clearStepTimerInterval();
-      stepTimerTotalSeconds.value = null;
-      stepTimerRemainingSeconds.value = 0;
-      stepTimerFinished.value = false;
+      stepTimerDetectionCounter += 1;
+      applyStepTimerSuggestion(undefined);
       return;
     }
-    prepareStepTimerForCurrentStep();
+    void detectCurrentStepTimerSuggestion();
   },
   { immediate: true }
 );
@@ -1445,6 +1483,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stepTimerDetectionCounter += 1;
   clearStepTimerInterval();
   cookingStepImageLoadCounter += 1;
   clearCurrentCookingStepImageUrl();
@@ -1715,17 +1754,21 @@ onUnmounted(() => {
               <div class="cooking-step-timer-actions">
                 <Button
                   size="small"
-                  class="cooking-step-timer-action"
+                  rounded
+                  class="cooking-step-timer-action cooking-step-timer-action--primary"
                   :icon="stepTimerActionIcon"
-                  :label="stepTimerActionLabel"
+                  :aria-label="stepTimerActionLabel"
+                  :title="stepTimerActionLabel"
                   @click="toggleStepTimer"
                 />
                 <Button
                   text
                   size="small"
+                  rounded
                   class="cooking-step-timer-action cooking-step-timer-action--reset"
                   icon="pi pi-refresh"
-                  label="Réinitialiser"
+                  aria-label="Réinitialiser le timer"
+                  title="Réinitialiser"
                   :disabled="stepTimerResetDisabled"
                   @click="resetStepTimer"
                 />
