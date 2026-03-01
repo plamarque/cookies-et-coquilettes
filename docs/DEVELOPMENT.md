@@ -32,6 +32,12 @@ npm run build:bff
 # Vérifications TypeScript
 npm run typecheck
 
+# Tests unitaires (domain + web)
+npm run test:unit
+
+# Tests unitaires web uniquement
+npm run test:unit -w @cookies-et-coquilettes/web
+
 # E2E Playwright
 npm run test:e2e
 npm run test:e2e:ui

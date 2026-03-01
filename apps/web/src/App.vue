@@ -17,6 +17,7 @@ import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./ser
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService, generateRecipeImage } from "./services/import-service";
+import { buildInstagramEmbedUrl } from "./utils/instagram-embed";
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT";
@@ -85,7 +86,6 @@ const imageLoadingMessage = ref<string>("");
 const servingsInput = ref("");
 
 const FEATURE_PORTIONS_ENABLED = false;
-const INSTAGRAM_HOSTS = new Set(["instagram.com", "www.instagram.com", "m.instagram.com", "instagr.am"]);
 
 const form = ref<RecipeFormState>(emptyForm());
 
@@ -297,31 +297,6 @@ function formToRecipe(existing?: Recipe): Recipe {
 const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
-
-function buildInstagramEmbedUrl(rawUrl?: string): string | undefined {
-  if (!rawUrl?.trim()) {
-    return undefined;
-  }
-  try {
-    const parsed = new URL(rawUrl.trim());
-    const host = parsed.hostname.toLowerCase();
-    if (!INSTAGRAM_HOSTS.has(host)) {
-      return undefined;
-    }
-    const [kindRaw, shortcodeRaw] = parsed.pathname
-      .split("/")
-      .filter(Boolean)
-      .slice(0, 2);
-    const kind = kindRaw?.toLowerCase();
-    const shortcode = shortcodeRaw?.trim();
-    if (!kind || !shortcode || !["p", "reel", "reels", "tv"].includes(kind)) {
-      return undefined;
-    }
-    return `https://www.instagram.com/${kind}/${shortcode}/embed`;
-  } catch {
-    return undefined;
-  }
-}
 
 const selectedRecipeInstagramEmbedUrl = computed(() =>
   buildInstagramEmbedUrl(selectedRecipe.value?.source?.url)
