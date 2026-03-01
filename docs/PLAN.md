@@ -19,6 +19,7 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | I | Import URL — Instagram (scraper open-source) | Différée |
 | J | Images recettes : génération IA automatique (fallback si pas d'extraction), placeholder | En cours |
 | K | Ajustement portions : recalcul quantités (UI masquée, implémentation à finaliser) | Différée |
+| L | Cible de partage PWA (`share_target`) + fallback presse-papiers multi-plateforme | Fait |
 
 ## Definition of Done par slice
 

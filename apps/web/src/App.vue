@@ -8,7 +8,8 @@ import type {
   ParsedRecipeDraft,
   Recipe,
   RecipeCategory,
-  RecipeFilters
+  RecipeFilters,
+  ShareImportPayload
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
@@ -17,10 +18,14 @@ import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./ser
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
 import { bffImportService, generateRecipeImage } from "./services/import-service";
+import {
+  clearShareImportParamsFromWindowLocation,
+  readShareImportPayloadFromWindow
+} from "./services/share-target-service";
 
 type ViewMode = "LIST" | "DETAIL" | "FORM" | "ADD_CHOICE";
 type FormMode = "CREATE" | "EDIT";
-type ImportProgressType = "url" | "text" | "screenshot" | "file";
+type ImportProgressType = "url" | "text" | "screenshot" | "file" | "share";
 
 interface IngredientInput {
   id: string;
@@ -76,6 +81,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const formImageInputRef = ref<HTMLInputElement | null>(null);
 const pasteFieldContent = ref("");
 const importBusy = ref(false);
+const clipboardBusy = ref(false);
 const importSourceType = ref<ImportProgressType | null>(null);
 const imageGenerating = ref(false);
 const imageReextracting = ref(false);
@@ -208,6 +214,8 @@ function sourceTypeLabel(source?: ImportSource): string {
 
 function importBusyLabel(type: ImportProgressType | null): string {
   switch (type) {
+    case "share":
+      return "Analyse du partage en cours…";
     case "url":
       return "Analyse de l'URL en cours…";
     case "text":
@@ -220,6 +228,9 @@ function importBusyLabel(type: ImportProgressType | null): string {
       return "Import en cours…";
   }
 }
+
+const shareTargetSupportHint =
+  "Le partage natif vers la PWA fonctionne surtout sur Android (Chrome/Edge, app installée). Sur iOS/Safari et Firefox, copiez l'URL puis utilisez le fallback ci-dessous.";
 
 function formToRecipe(existing?: Recipe): Recipe {
   const now = new Date().toISOString();
@@ -357,6 +368,60 @@ function isLikelyUrl(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+async function runImportFromSharePayload(payload: ShareImportPayload): Promise<void> {
+  clearMessages();
+  importBusy.value = true;
+  importSourceType.value = "share";
+  viewMode.value = "ADD_CHOICE";
+  try {
+    const draft = await bffImportService.importFromShare(payload);
+    await createRecipeFromDraft(draft);
+  } catch (error) {
+    if (payload.url || payload.text) {
+      pasteFieldContent.value = payload.url ?? payload.text ?? "";
+    }
+    setError(error);
+  } finally {
+    importBusy.value = false;
+    importSourceType.value = null;
+  }
+}
+
+async function importFromClipboardFallback(): Promise<void> {
+  clearMessages();
+  if (!navigator.clipboard?.readText) {
+    setError(
+      new Error("Lecture du presse-papiers non supportée ici. Collez manuellement dans le champ.")
+    );
+    return;
+  }
+
+  clipboardBusy.value = true;
+  try {
+    const content = (await navigator.clipboard.readText()).trim();
+    if (!content) {
+      throw new Error("Le presse-papiers est vide.");
+    }
+    pasteFieldContent.value = content;
+    feedback.value = "Contenu du presse-papiers collé. Vous pouvez lancer l'import.";
+  } catch (error) {
+    setError(error);
+  } finally {
+    clipboardBusy.value = false;
+  }
+}
+
+async function consumeShareTargetPayloadFromUrl(): Promise<void> {
+  const payload = readShareImportPayloadFromWindow();
+  if (!payload) {
+    return;
+  }
+
+  // Clear query params early to avoid duplicate import on refresh/back navigation.
+  clearShareImportParamsFromWindowLocation();
+  await runImportFromSharePayload(payload);
 }
 
 async function runImportFromPasteField(): Promise<void> {
@@ -821,6 +886,7 @@ async function toggleCookingMode(): Promise<void> {
 onMounted(async () => {
   await seedIfEmpty();
   await refresh();
+  await consumeShareTargetPayloadFromUrl();
 });
 </script>
 
@@ -944,6 +1010,11 @@ onMounted(async () => {
         <p>{{ importBusyLabel(importSourceType) }}</p>
       </div>
 
+      <div class="share-target-hint">
+        <i class="pi pi-share-alt" />
+        <p>{{ shareTargetSupportHint }}</p>
+      </div>
+
       <div class="stack">
         <label for="paste-field">Collez une URL, du texte ou une image</label>
         <textarea
@@ -957,8 +1028,16 @@ onMounted(async () => {
         <Button
           label="Importer"
           icon="pi pi-download"
-          :disabled="importBusy || !pasteFieldContent.trim()"
+          :disabled="importBusy || clipboardBusy || !pasteFieldContent.trim()"
           @click="runImportFromPasteField"
+        />
+        <Button
+          label="Coller depuis le presse-papiers"
+          icon="pi pi-clipboard"
+          severity="secondary"
+          :loading="clipboardBusy"
+          :disabled="importBusy"
+          @click="importFromClipboardFallback"
         />
       </div>
 

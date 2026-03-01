@@ -33,19 +33,13 @@ export default defineConfig({
           }
         ],
         share_target: {
-          action: "import",
-          method: "POST",
-          enctype: "multipart/form-data",
+          // GET keeps the flow simple for static hosting + SPA routing.
+          action: ".",
+          method: "GET",
           params: {
-            title: "title",
-            text: "text",
-            url: "url",
-            files: [
-              {
-                name: "files",
-                accept: ["image/*", "text/plain"]
-              }
-            ]
+            title: "share-title",
+            text: "share-text",
+            url: "share-url"
           }
         }
       }
