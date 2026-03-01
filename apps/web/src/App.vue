@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
@@ -92,8 +92,28 @@ const recipeIdWithPendingImage = ref<string | null>(null);
 const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
+const cookingStepIndex = ref(0);
+const showCookingIngredients = ref(false);
+const cookingSwipeStartX = ref<number | null>(null);
 
 const FEATURE_PORTIONS_ENABLED = false;
+const INGREDIENT_TOKEN_STOPWORDS = new Set([
+  "de",
+  "du",
+  "des",
+  "le",
+  "la",
+  "les",
+  "au",
+  "aux",
+  "un",
+  "une",
+  "et",
+  "ou",
+  "a",
+  "avec",
+  "pour"
+]);
 
 const form = ref<RecipeFormState>(emptyForm());
 
@@ -135,6 +155,53 @@ function parseNumber(value: string): number | undefined {
     return undefined;
   }
   return parsed;
+}
+
+function normalizeForIngredientMatching(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractIngredientSearchTerms(label: string): string[] {
+  const normalizedLabel = normalizeForIngredientMatching(label);
+  if (!normalizedLabel) {
+    return [];
+  }
+
+  const labelTokens = normalizedLabel
+    .split(" ")
+    .filter(
+      (token) =>
+        token.length >= 3 && !INGREDIENT_TOKEN_STOPWORDS.has(token)
+    );
+  return Array.from(new Set([normalizedLabel, ...labelTokens]));
+}
+
+function stepMentionsIngredient(stepTextNormalized: string, ingredientLabel: string): boolean {
+  const terms = extractIngredientSearchTerms(ingredientLabel);
+  if (terms.length === 0 || !stepTextNormalized) {
+    return false;
+  }
+
+  return terms.some((term) => {
+    if (term.includes(" ")) {
+      return stepTextNormalized.includes(term);
+    }
+    const pluralSuffix = term.endsWith("s") || term.endsWith("x") ? "" : "(?:s|x)?";
+    const tokenPattern = new RegExp(
+      `(^|[^a-z0-9])${escapeRegExp(term)}${pluralSuffix}([^a-z0-9]|$)`
+    );
+    return tokenPattern.test(stepTextNormalized);
+  });
 }
 
 function toForm(recipe: Recipe): RecipeFormState {
@@ -319,6 +386,45 @@ const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
 );
 
+const selectedRecipeSteps = computed(() => {
+  if (!selectedRecipe.value) {
+    return [];
+  }
+  return [...selectedRecipe.value.steps].sort((a, b) => a.order - b.order);
+});
+
+const normalizedCookingStepIndex = computed(() => {
+  const totalSteps = selectedRecipeSteps.value.length;
+  if (totalSteps === 0) {
+    return 0;
+  }
+  return ((cookingStepIndex.value % totalSteps) + totalSteps) % totalSteps;
+});
+
+const currentCookingStep = computed(() => {
+  const steps = selectedRecipeSteps.value;
+  if (steps.length === 0) {
+    return null;
+  }
+  return steps[normalizedCookingStepIndex.value];
+});
+
+const currentStepMentionedIngredients = computed(() => {
+  const recipe = selectedRecipe.value;
+  const step = currentCookingStep.value;
+  if (!recipe || !step) {
+    return [];
+  }
+
+  const normalizedStepText = normalizeForIngredientMatching(step.text);
+  if (!normalizedStepText) {
+    return [];
+  }
+
+  return recipe.ingredients.filter((ingredient) =>
+    stepMentionsIngredient(normalizedStepText, ingredient.label)
+  );
+});
 const selectedRecipeIngredientsSorted = computed(() => {
   const recipe = selectedRecipe.value;
   if (!recipe?.ingredients.length) return [];
@@ -332,7 +438,6 @@ const selectedRecipeInstagramEmbedUrl = computed(() =>
 const formInstagramEmbedUrl = computed(() =>
   buildInstagramEmbedUrl(form.value.source?.url)
 );
-
 const favoriteCount = computed(() =>
   recipes.value.filter((recipe) => recipe.favorite).length
 );
@@ -536,6 +641,22 @@ watch(activeFilters, async () => {
   await refresh();
 });
 
+watch(selectedRecipeId, () => {
+  cookingStepIndex.value = 0;
+  showCookingIngredients.value = false;
+});
+
+watch(
+  cookingState,
+  (state) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.body.style.overflow = state !== "OFF" ? "hidden" : "";
+  },
+  { immediate: true }
+);
+
 function setError(error: unknown): void {
   errorMessage.value = error instanceof Error ? error.message : "Une erreur est survenue.";
   // eslint-disable-next-line no-console
@@ -664,6 +785,8 @@ function startAsyncImageForRecipe(recipeId: string, draft: ParsedRecipeDraft): v
 function openDetail(recipe: Recipe): void {
   clearMessages();
   selectedRecipeId.value = recipe.id;
+  cookingStepIndex.value = 0;
+  showCookingIngredients.value = false;
   servingsInput.value = recipe.servingsCurrent
     ? String(recipe.servingsCurrent)
     : recipe.servingsBase
@@ -767,6 +890,55 @@ function removeStep(id: string): void {
   if (form.value.steps.length === 0) {
     form.value.steps.push(emptyStep());
   }
+}
+
+function goToCookingStep(index: number): void {
+  const totalSteps = selectedRecipeSteps.value.length;
+  if (totalSteps === 0) {
+    return;
+  }
+  cookingStepIndex.value = ((index % totalSteps) + totalSteps) % totalSteps;
+}
+
+function goToPreviousCookingStep(): void {
+  goToCookingStep(normalizedCookingStepIndex.value - 1);
+}
+
+function goToNextCookingStep(): void {
+  goToCookingStep(normalizedCookingStepIndex.value + 1);
+}
+
+function toggleCookingIngredientsVisibility(): void {
+  showCookingIngredients.value = !showCookingIngredients.value;
+}
+
+function onCookingSliderTouchStart(event: TouchEvent): void {
+  const firstTouch = event.touches[0];
+  cookingSwipeStartX.value = firstTouch?.clientX ?? null;
+}
+
+function onCookingSliderTouchEnd(event: TouchEvent): void {
+  if (cookingSwipeStartX.value === null) {
+    return;
+  }
+  const firstTouch = event.changedTouches[0];
+  const endX = firstTouch?.clientX;
+  if (endX === undefined) {
+    cookingSwipeStartX.value = null;
+    return;
+  }
+
+  const deltaX = endX - cookingSwipeStartX.value;
+  cookingSwipeStartX.value = null;
+  if (Math.abs(deltaX) < 45) {
+    return;
+  }
+
+  if (deltaX < 0) {
+    goToNextCookingStep();
+    return;
+  }
+  goToPreviousCookingStep();
 }
 
 async function saveForm(): Promise<void> {
@@ -927,6 +1099,8 @@ async function toggleCookingMode(): Promise<void> {
   clearMessages();
   try {
     if (cookingState.value === "OFF") {
+      cookingStepIndex.value = 0;
+      showCookingIngredients.value = false;
       const session = await browserCookingModeService.startCookingMode();
       cookingState.value = session.strategy;
       feedback.value =
@@ -938,6 +1112,7 @@ async function toggleCookingMode(): Promise<void> {
 
     await browserCookingModeService.stopCookingMode();
     cookingState.value = "OFF";
+    showCookingIngredients.value = false;
     feedback.value = "Mode cuisine désactivé.";
   } catch (error) {
     setError(error);
@@ -948,6 +1123,12 @@ onMounted(async () => {
   await seedIfEmpty();
   await refresh();
   await consumeShareTargetPayloadFromUrl();
+});
+
+onUnmounted(() => {
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = "";
+  }
 });
 </script>
 
@@ -1141,6 +1322,128 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="viewMode === 'DETAIL' && selectedRecipe" class="panel detail">
+      <Teleport v-if="cookingState !== 'OFF'" to="body">
+        <div
+          class="cooking-fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mode cuisine plein écran"
+          @touchstart.passive="onCookingSliderTouchStart"
+          @touchend.passive="onCookingSliderTouchEnd"
+        >
+          <div class="cooking-fullscreen-header">
+            <div class="cooking-fullscreen-title-block">
+              <p class="cooking-fullscreen-title">{{ selectedRecipe.title }}</p>
+              <p v-if="currentCookingStep" class="cooking-step-status">
+                Étape {{ normalizedCookingStepIndex + 1 }} / {{ selectedRecipeSteps.length }}
+              </p>
+            </div>
+            <Button
+              text
+              icon="pi pi-times"
+              aria-label="Quitter le mode cuisine"
+              class="cooking-fullscreen-close"
+              @click="toggleCookingMode"
+            />
+          </div>
+
+          <div class="cooking-fullscreen-media-zone">
+            <RecipeImage
+              v-if="selectedRecipe.imageId"
+              :image-id="selectedRecipe.imageId"
+              img-class="cooking-fullscreen-media-image"
+            />
+            <div v-else class="cooking-fullscreen-media-placeholder">
+              <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
+              <Button
+                text
+                size="small"
+                icon="pi pi-image"
+                label="Ajouter une image"
+                @click="openEditForm(selectedRecipe)"
+              />
+            </div>
+
+            <section
+              class="cooking-media-ingredients-overlay"
+              aria-label="Ingrédients mentionnés dans l'étape"
+            >
+              <h3>Ingrédients de l'étape</h3>
+              <ul
+                v-if="currentStepMentionedIngredients.length > 0"
+                class="cooking-media-ingredients-list"
+              >
+                <li v-for="ingredient in currentStepMentionedIngredients" :key="ingredient.id">
+                  <span class="cooking-media-ingredients-label">{{ ingredient.label }}</span>
+                  <span v-if="ingredient.quantity !== undefined" class="cooking-media-ingredients-qty">
+                    {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+                  </span>
+                </li>
+              </ul>
+              <p v-else class="cooking-media-ingredients-empty">
+                Aucun ingrédient détecté automatiquement.
+              </p>
+            </section>
+          </div>
+
+          <template v-if="currentCookingStep">
+            <p class="cooking-step-text cooking-step-text--fullscreen">{{ currentCookingStep.text }}</p>
+            <p class="cooking-step-hint">Glissez horizontalement ou utilisez les boutons.</p>
+
+            <div class="cooking-step-navigation" role="group" aria-label="Navigation des étapes">
+              <Button
+                icon="pi pi-chevron-left"
+                label="Précédente"
+                class="cooking-step-nav"
+                @click="goToPreviousCookingStep"
+              />
+              <Button
+                icon="pi pi-chevron-right"
+                iconPos="right"
+                label="Suivante"
+                class="cooking-step-nav"
+                @click="goToNextCookingStep"
+              />
+            </div>
+            <div
+              v-if="selectedRecipeSteps.length > 1"
+              class="cooking-step-dots"
+              role="tablist"
+              aria-label="Accès direct aux étapes"
+            >
+              <button
+                v-for="(step, index) in selectedRecipeSteps"
+                :key="step.id"
+                type="button"
+                :class="['cooking-step-dot', { 'cooking-step-dot--active': index === normalizedCookingStepIndex }]"
+                :aria-label="`Aller à l'étape ${index + 1}`"
+                :aria-current="index === normalizedCookingStepIndex ? 'step' : undefined"
+                @click="goToCookingStep(index)"
+              />
+            </div>
+          </template>
+          <p v-else class="muted">Aucune étape à afficher pour cette recette.</p>
+
+          <div class="cooking-ingredients-toggle-row">
+            <Button
+              text
+              size="small"
+              :icon="showCookingIngredients ? 'pi pi-eye-slash' : 'pi pi-list'"
+              :label="showCookingIngredients ? 'Masquer tous les ingrédients' : 'Voir tous les ingrédients'"
+              @click="toggleCookingIngredientsVisibility"
+            />
+          </div>
+          <ul v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
+            <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
+              <strong>{{ ingredient.label }}</strong>
+              <span v-if="ingredient.quantity !== undefined">
+                : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+              </span>
+            </li>
+          </ul>
+        </div>
+      </Teleport>
+
       <div class="recipe-detail-header">
         <RecipeImage
           v-if="selectedRecipe.imageId"
@@ -1262,7 +1565,7 @@ onMounted(async () => {
 
       <h3>Étapes</h3>
       <ol>
-        <li v-for="step in selectedRecipe.steps" :key="step.id">{{ step.text }}</li>
+        <li v-for="step in selectedRecipeSteps" :key="step.id">{{ step.text }}</li>
       </ol>
     </section>
 
