@@ -52,7 +52,7 @@ export async function generateRecipeImage(
 }
 
 /**
- * Génère une image d'ingrédient isolé (photoréaliste, lisible en petit format).
+ * Génère une image d'ingrédient isolé (style photo produit, gros plan, fond blanc, sans mise en scène ni ombres).
  */
 export async function generateIngredientImage(
   input: GenerateIngredientImageInput
@@ -67,7 +67,7 @@ export async function generateIngredientImage(
     return undefined;
   }
 
-  const prompt = `Photorealistic close-up of a single cooking ingredient: "${label}". Studio kitchen workshop aesthetic, centered subject, clean neutral background, crisp details, soft natural light, high contrast edges for small icon readability. No text, no labels, no hands, no packaging brand.`;
+  const prompt = `Product photography style, close-up of a single cooking ingredient: "${label}". Ingredient as sole main subject, centered, well visible. Plain white background, no staging, no background elements, no shadows, no shadow effects. Crisp details, high contrast edges for small icon readability. No text, no labels, no hands, no packaging brand.`;
 
   try {
     const client = new OpenAI({ apiKey });
