@@ -85,13 +85,13 @@ Pour les tests d’import (fichier, URL YouTube), le BFF doit être en cours d�
 
 ## CI (GitHub Actions)
 
-Le workflow `.github/workflows/e2e.yml` exécute tous les tests E2E (y compris ceux dépendant du BFF) sur chaque push et PR vers `main`. Pour que les tests d'import fonctionnent, configurer le secret :
+Le workflow `.github/workflows/e2e.yml` exécute tous les tests E2E (y compris ceux dépendant du BFF) sur chaque push et PR vers `main`. Les tests YouTube et Instagram sont ignorés en CI (APIs externes flaky/bloquées). Pour que les tests d'import fichier fonctionnent, configurer le secret :
 
 - **Repository** > Settings > Secrets and variables > Actions > New repository secret
 - Nom : `OPENAI_API_KEY`
 - Valeur : la clé API OpenAI (parsing et génération d'images)
 
-Sans ce secret, le BFF tourne en mode fallback et les tests YouTube/Instagram peuvent échouer ou être instables.
+Sans ce secret, le BFF tourne en mode fallback et le test d'import fichier peut échouer.
 
 ## Déploiement
 
