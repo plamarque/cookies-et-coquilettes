@@ -415,7 +415,7 @@ function importBusyLabel(type: ImportProgressType | null): string {
     case "text":
       return "Analyse du texte en cours…";
     case "screenshot":
-      return "Lecture de l'image en cours…";
+      return "Lecture des images en cours…";
     case "file":
       return "Lecture du fichier en cours…";
     default:
@@ -481,6 +481,7 @@ function formToRecipe(existing?: Recipe): Recipe {
     prepTimeMin: parseNumber(form.value.prepTimeMin),
     cookTimeMin: parseNumber(form.value.cookTimeMin),
     source,
+    sourceImageIds: existing?.sourceImageIds,
     imageId:
       form.value.imageId === null
         ? undefined
@@ -499,6 +500,10 @@ function formToRecipe(existing?: Recipe): Recipe {
 
 const selectedRecipe = computed(() =>
   recipes.value.find((recipe) => recipe.id === selectedRecipeId.value) ?? null
+);
+
+const formRecipeSourceImageIds = computed(
+  () => recipes.value.find((r) => r.id === formRecipeId.value)?.sourceImageIds ?? []
 );
 
 const selectedRecipeSteps = computed(() => {
@@ -955,7 +960,43 @@ async function runImportFromFile(file: File): Promise<void> {
       const text = await file.text();
       draft = await bffImportService.importFromText(text);
     }
-    await createRecipeFromDraft(draft, isImageFile ? file : undefined);
+    await createRecipeFromDraft(draft, isImageFile ? [file] : undefined);
+  } catch (error) {
+    setError(error);
+  } finally {
+    importBusy.value = false;
+    importSourceType.value = null;
+  }
+}
+
+async function runImportFromFiles(files: File[]): Promise<void> {
+  if (files.length === 0) return;
+  clearMessages();
+  importBusy.value = true;
+  importSourceType.value = "screenshot";
+  try {
+    const draft = await bffImportService.importFromScreenshots(files);
+    await createRecipeFromDraft(draft, files);
+  } catch (error) {
+    setError(error);
+  } finally {
+    importBusy.value = false;
+    importSourceType.value = null;
+  }
+}
+
+async function runImportFromPasteFieldWithText(text: string): Promise<void> {
+  clearMessages();
+  importBusy.value = true;
+  importSourceType.value = isLikelyUrl(text) ? "url" : "text";
+  try {
+    let draft: ParsedRecipeDraft;
+    if (importSourceType.value === "url") {
+      draft = await bffImportService.importFromUrl(text);
+    } else {
+      draft = await bffImportService.importFromText(text);
+    }
+    await createRecipeFromDraft(draft);
   } catch (error) {
     setError(error);
   } finally {
@@ -966,11 +1007,26 @@ async function runImportFromFile(file: File): Promise<void> {
 
 function onFilePicked(event: Event): void {
   const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (file) {
-    runImportFromFile(file);
-  }
+  const files = target.files ? [...target.files] : [];
   target.value = "";
+  if (files.length === 0) return;
+
+  const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+  const textFiles = files.filter(
+    (f) =>
+      f.type === "text/plain" ||
+      f.type === "text/html" ||
+      f.name.endsWith(".txt") ||
+      f.name.endsWith(".html")
+  );
+
+  if (imageFiles.length > 0) {
+    runImportFromFiles(imageFiles);
+  } else if (textFiles.length > 0) {
+    void textFiles[0].text().then((text) => {
+      runImportFromPasteFieldWithText(text);
+    });
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -1133,7 +1189,7 @@ function fallbackImportMessage(source?: ImportSource): string {
 
 async function createRecipeFromDraft(
   draft: ParsedRecipeDraft,
-  fallbackScreenshotFile?: File
+  screenshotFiles?: File[]
 ): Promise<void> {
   clearMessages();
   form.value = draftToForm(draft);
@@ -1146,17 +1202,27 @@ async function createRecipeFromDraft(
     };
   }
 
+  if (
+    draft.source?.type === "SCREENSHOT" &&
+    screenshotFiles &&
+    screenshotFiles.length > 0
+  ) {
+    const sourceImageIds: string[] = [];
+    for (const file of screenshotFiles) {
+      const id = await storeImageFromFile(file);
+      if (id) sourceImageIds.push(id);
+    }
+    if (sourceImageIds.length > 0) {
+      recipe = { ...recipe, sourceImageIds };
+    }
+    if (isMinimalFallbackDraft(draft) && sourceImageIds[0]) {
+      recipe = { ...recipe, imageId: sourceImageIds[0] };
+    }
+  }
+
   await dexieRecipeService.createRecipe(recipe);
   selectedRecipeId.value = recipe.id;
   favoriteOnly.value = false;
-
-  if (isMinimalFallbackDraft(draft) && draft.source?.type === "SCREENSHOT" && fallbackScreenshotFile) {
-    const imageId = await storeImageFromFile(fallbackScreenshotFile);
-    if (imageId) {
-      await dexieRecipeService.updateRecipe(recipe.id, { imageId });
-      recipe = { ...recipe, imageId };
-    }
-  }
 
   await refresh();
 
@@ -1866,7 +1932,7 @@ onUnmounted(() => {
           @click="openCreateForm"
         />
         <Button
-          label="Choisir une image"
+          label="Choisir des images"
           icon="pi pi-image"
           :disabled="importBusy"
           @click="triggerFilePick"
@@ -1877,6 +1943,7 @@ onUnmounted(() => {
         ref="fileInputRef"
         type="file"
         accept="image/*,.txt,text/plain,text/html"
+        multiple
         class="hidden-file-input"
         @change="onFilePicked"
       />
@@ -2172,7 +2239,29 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <p v-if="selectedRecipe.source && !selectedRecipe.source.url" class="source-hint">
+      <div v-if="selectedRecipe.source?.type === 'SCREENSHOT' && selectedRecipe.sourceImageIds?.length" class="source-images-section">
+        <p class="source-images-label">
+          <i class="pi pi-images" />
+          Images sources importées
+        </p>
+        <div class="source-images-thumbnails">
+          <button
+            v-for="(imgId, idx) in selectedRecipe.sourceImageIds"
+            :key="imgId"
+            type="button"
+            class="source-image-thumb"
+            :aria-label="`Voir l'image source ${idx + 1} en grand`"
+            @click="recipeImageFullscreenId = imgId"
+          >
+            <RecipeImage
+              :image-id="imgId"
+              :alt="`Source ${idx + 1}`"
+              img-class="source-image-thumb-img"
+            />
+          </button>
+        </div>
+      </div>
+      <p v-else-if="selectedRecipe.source && !selectedRecipe.source.url" class="source-hint">
         <i class="pi pi-paperclip" />
         Source : {{ sourceTypeLabel(selectedRecipe.source) }}
       </p>
@@ -2278,9 +2367,31 @@ onUnmounted(() => {
             @click="triggerFullReextract"
           />
         </div>
-        <small v-if="form.source && !form.source.url" class="muted">
+        <small
+          v-else-if="form.source && !form.source.url && !(form.source.type === 'SCREENSHOT' && formRecipeSourceImageIds.length)"
+          class="muted"
+        >
           Source import : {{ sourceTypeLabel(form.source) }}
         </small>
+        <div
+          v-if="form.source?.type === 'SCREENSHOT' && formRecipeSourceImageIds.length"
+          class="source-images-thumbnails source-images-thumbnails--form"
+        >
+          <button
+            v-for="(imgId, idx) in formRecipeSourceImageIds"
+            :key="imgId"
+            type="button"
+            class="source-image-thumb"
+            :aria-label="`Voir l'image source ${idx + 1} en grand`"
+            @click="recipeImageFullscreenId = imgId"
+          >
+            <RecipeImage
+              :image-id="imgId"
+              :alt="`Source ${idx + 1}`"
+              img-class="source-image-thumb-img"
+            />
+          </button>
+        </div>
       </div>
 
       <div class="stack">

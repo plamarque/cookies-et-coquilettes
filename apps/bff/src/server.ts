@@ -4,7 +4,11 @@ import { config } from "dotenv";
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import { extractImageFromUrl, parseRecipeWithCloud } from "./parsing-client.js";
+import {
+  extractImageFromUrl,
+  parseRecipeWithCloud,
+  reorderStepsByRecipeLogic
+} from "./parsing-client.js";
 import {
   generateCookingStepImage,
   generateIngredientImage,
@@ -98,6 +102,23 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
     screenshotMimeType: req.file.mimetype
   });
   res.json(parsed);
+});
+
+app.post("/api/import/reorder-steps", async (req, res) => {
+  const steps = req.body?.steps as Array<{ id?: string; order?: number; text?: string }> | undefined;
+  if (!Array.isArray(steps) || steps.length === 0) {
+    res.status(400).json({ error: "steps array is required" });
+    return;
+  }
+  const normalized = steps
+    .filter((s) => s && typeof s.text === "string" && s.text.trim())
+    .map((s) => ({
+      id: s.id ?? `step-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      order: typeof s.order === "number" ? s.order : 0,
+      text: String(s.text).trim()
+    }));
+  const reordered = await reorderStepsByRecipeLogic(normalized);
+  res.json({ steps: reordered });
 });
 
 app.post("/api/import/extract-image", async (req, res) => {

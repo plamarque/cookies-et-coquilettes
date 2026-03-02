@@ -1,6 +1,8 @@
 import type {
   ImportService,
   ImportType,
+  IngredientLine,
+  InstructionStep,
   ParsedRecipeDraft,
   ShareImportPayload
 } from "@cookies-et-coquilettes/domain";
@@ -110,6 +112,94 @@ async function compressScreenshot(file: File): Promise<File> {
   }
 }
 
+/** Extrait le numéro d'étape en début de texte (ex. "25. Égaliser...", "Étape 11 :") */
+function extractStepNumberFromText(text: string): number | undefined {
+  const m = text.match(/^(\d+)[\.\)\s\-:]|^Étape\s+(\d+)/i);
+  const n = m ? parseInt(m[1] ?? m[2] ?? "", 10) : NaN;
+  return Number.isFinite(n) && n >= 1 && n <= 999 ? n : undefined;
+}
+
+function mergeDrafts(drafts: ParsedRecipeDraft[]): ParsedRecipeDraft {
+  if (drafts.length === 0) {
+    return fallbackDraft("SCREENSHOT", "Recette importée");
+  }
+  if (drafts.length === 1) {
+    return drafts[0];
+  }
+
+  const first = drafts[0];
+  const title =
+    drafts.map((d) => d.title?.trim()).find((t) => t && t !== "Recette depuis capture") ??
+    first.title ??
+    "Recette importée";
+  const category = first.category ?? "SALE";
+  const servingsBase =
+    drafts.find((d) => typeof d.servingsBase === "number")?.servingsBase ?? first.servingsBase;
+  const prepTimeMin =
+    drafts.find((d) => typeof d.prepTimeMin === "number")?.prepTimeMin ?? first.prepTimeMin;
+  const cookTimeMin =
+    drafts.find((d) => typeof d.cookTimeMin === "number")?.cookTimeMin ?? first.cookTimeMin;
+  const imageUrl = drafts.find((d) => d.imageUrl)?.imageUrl ?? first.imageUrl;
+
+  const seenLabels = new Set<string>();
+  const ingredients: IngredientLine[] = [];
+  let ingIdx = 0;
+  for (const draft of drafts) {
+    for (const ing of draft.ingredients ?? []) {
+      const label = (ing.label ?? "").trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      if (seenLabels.has(key)) continue;
+      seenLabels.add(key);
+      ingredients.push({
+        id: `ing-${ingIdx++}-${Date.now()}`,
+        label,
+        quantity: typeof ing.quantity === "number" ? ing.quantity : undefined,
+        unit: ing.unit?.trim() || undefined,
+        isScalable: Boolean(ing.isScalable)
+      });
+    }
+  }
+
+  const allSteps: Array<{ order: number; text: string; draftIdx: number }> = [];
+  drafts.forEach((draft, draftIdx) => {
+    let stepIdx = 0;
+    for (const s of draft.steps ?? []) {
+      const text = (s.text ?? "").trim();
+      if (!text) continue;
+      const fromText = extractStepNumberFromText(text);
+      const fromPayload = typeof s.order === "number" ? s.order : undefined;
+      const orderVal = fromText ?? fromPayload ?? (draftIdx * 1000 + stepIdx);
+      allSteps.push({ order: orderVal, text, draftIdx });
+      stepIdx++;
+    }
+  });
+  allSteps.sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    return a.draftIdx - b.draftIdx;
+  });
+  const steps: InstructionStep[] = allSteps.map((s, idx) => ({
+    id: `step-${idx + 1}-${Date.now()}`,
+    order: idx + 1,
+    text: s.text
+  }));
+
+  return {
+    title,
+    category,
+    servingsBase,
+    prepTimeMin,
+    cookTimeMin,
+    ingredients,
+    steps,
+    imageUrl,
+    source: first.source ?? {
+      type: "SCREENSHOT" as ImportType,
+      capturedAt: new Date().toISOString()
+    }
+  };
+}
+
 class BffImportService implements ImportService {
   async importFromUrl(url: string): Promise<ParsedRecipeDraft> {
     try {
@@ -161,6 +251,33 @@ class BffImportService implements ImportService {
       console.warn("importFromScreenshot fallback draft", error);
       return fallbackDraft("SCREENSHOT", file.name.replace(/\.[^.]+$/, ""));
     }
+  }
+
+  async importFromScreenshots(files: File[]): Promise<ParsedRecipeDraft> {
+    const drafts: ParsedRecipeDraft[] = [];
+    for (const file of files) {
+      const draft = await this.importFromScreenshot(file);
+      drafts.push(draft);
+    }
+    let merged = mergeDrafts(drafts);
+    if (merged.steps.length > 1) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/import/reorder-steps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            steps: merged.steps.map((s) => ({ id: s.id, order: s.order, text: s.text }))
+          })
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { steps: InstructionStep[] };
+          merged = { ...merged, steps: data.steps };
+        }
+      } catch {
+        // keep merged as-is on reorder failure
+      }
+    }
+    return merged;
   }
 
   async importFromText(text: string): Promise<ParsedRecipeDraft> {

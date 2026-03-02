@@ -38,6 +38,8 @@ export interface Recipe {
   cookTimeMin?: number;
   imageId?: string;
   source?: ImportSource;
+  /** IDs des images sources (captures d'écran importées), consultables en vignettes */
+  sourceImageIds?: string[];
   createdAt: string;
   updatedAt: string;
 }

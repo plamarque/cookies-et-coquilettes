@@ -2,7 +2,12 @@ import * as cheerio from "cheerio";
 import OpenAI from "openai";
 import { instagramGetUrl, type InstagramResponse } from "instagram-url-direct";
 import { extractYouTubeVideoId, isYouTubeUrl } from "./youtube-utils.js";
-import type { IngredientLine, ImportType, ParsedRecipeDraft } from "./types.js";
+import type {
+  IngredientLine,
+  ImportType,
+  InstructionStep,
+  ParsedRecipeDraft
+} from "./types.js";
 
 export interface ParseRecipeInput {
   sourceType: ImportType;
@@ -491,6 +496,13 @@ interface LlmRecipePayload {
   steps?: Array<{ order?: number; text?: string }>;
 }
 
+/** Extrait le numéro d'étape en début de texte (ex. "25. Égaliser...", "Étape 11 :") */
+function extractStepNumberFromText(text: string): number | undefined {
+  const m = text.match(/^(\d+)[\.\)\s\-:]|^Étape\s+(\d+)/i);
+  const n = m ? parseInt(m[1] ?? m[2] ?? "", 10) : NaN;
+  return Number.isFinite(n) && n >= 1 && n <= 999 ? n : undefined;
+}
+
 function parseLlmRecipePayload(raw: string): LlmRecipePayload | null {
   let json = raw.replace(/^```json?\s*|\s*```$/g, "").trim();
   // Fix trailing commas (invalid JSON but common in LLM output)
@@ -517,14 +529,22 @@ function toDraftFromLlmPayload(
     unit: ing.unit?.trim() || undefined,
     isScalable: Boolean(ing.isScalable)
   }));
-  const steps = [...(parsed.steps ?? [])]
-    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+  const rawSteps = (parsed.steps ?? [])
+    .map((s) => ({ ...s, text: String(s.text ?? "").trim() }))
+    .filter((s) => s.text);
+  const steps = rawSteps
+    .map((s, idx) => {
+      const text = s.text!;
+      const fromText = extractStepNumberFromText(text);
+      const order = fromText ?? (typeof s.order === "number" ? s.order : undefined) ?? idx + 1;
+      return { order, text, idx };
+    })
+    .sort((a, b) => a.order - b.order)
     .map((s, idx) => ({
       id: `step-${idx}-${Date.now()}`,
       order: idx + 1,
-      text: String(s.text ?? "").trim()
-    }))
-    .filter((s) => s.text);
+      text: s.text
+    }));
 
   return {
     title,
@@ -637,7 +657,7 @@ Règles :
 - Extraire uniquement ce qui est lisible sur l'image.
 - Si une valeur n'est pas lisible, mettre null (ou [] pour listes).
 - Conserver les ingrédients en français quand possible.
-- Ordonner les étapes dans l'ordre de lecture de la recette.`;
+- IMPORTANT pour les étapes : si des numéros sont affichés sur l'image (badges, encadrés), les respecter strictement. Utiliser ces numéros comme "order" ET les inclure au début du texte (ex. "25. Égaliser les bords..."). Sinon, ordre de lecture (1, 2, 3...).`;
 
   try {
     const completion = await client.chat.completions.create({
@@ -664,11 +684,97 @@ Règles :
     if (!raw) return fallbackDraft("Recette depuis capture", sourceType, url);
     const parsed = parseLlmRecipePayload(raw);
     if (!parsed) return fallbackDraft("Recette depuis capture", sourceType, url);
-    return toDraftFromLlmPayload(parsed, sourceType, url);
+    let draft = toDraftFromLlmPayload(parsed, sourceType, url);
+    if (draft.steps.length > 1) {
+      draft = {
+        ...draft,
+        steps: await reorderStepsByRecipeLogic(draft.steps)
+      };
+    }
+    return draft;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("OpenAI screenshot parse error", err);
     return fallbackDraft("Recette depuis capture", sourceType, url);
+  }
+}
+
+export async function reorderStepsByRecipeLogic(
+  steps: InstructionStep[]
+): Promise<InstructionStep[]> {
+  if (steps.length <= 1) return steps;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return steps;
+
+  const stepTexts = steps.map((s) => s.text).join("\n");
+  const prompt = `Des étapes de recette ont été extraites dans un ordre possiblement incorrect.
+Réordonne-les pour suivre la logique chronologique d'exécution :
+1. Préparation des ingrédients
+2. Mélange / pâte
+3. Cuisson
+4. Refroidissement
+5. Assemblage / montage
+6. Finition (égaliser, saupoudrer, dresser, réserver au frais)
+
+Réponds UNIQUEMENT avec un JSON valide : [{"text": "étape 1"}, {"text": "étape 2"}, ...]
+Conserve le texte de chaque étape à l'identique. Ne fusionne pas, ne modifie pas.
+
+Étapes à réordonner :
+${stepTexts}`;
+
+  try {
+    const client = new OpenAI({ apiKey });
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1
+    });
+    const raw = completion.choices[0]?.message?.content?.trim();
+    if (!raw) return steps;
+    let arr: Array<{ text?: string }>;
+    try {
+      const json = raw.replace(/^```json?\s*|\s*```$/g, "").replace(/,(\s*[}\]])/g, "$1");
+      arr = JSON.parse(json);
+    } catch {
+      return steps;
+    }
+    if (!Array.isArray(arr) || arr.length === 0) return steps;
+
+    const normalized = (t: string) => t.replace(/^\d+[\.\)\s\-:]/, "").trim().toLowerCase();
+    const remaining = new Map<string, InstructionStep>();
+    for (const s of steps) {
+      const k = normalized(s.text);
+      if (!remaining.has(k)) remaining.set(k, s);
+    }
+
+    const reordered: InstructionStep[] = [];
+    const used = new Set<InstructionStep>();
+
+    for (let i = 0; i < arr.length; i++) {
+      const text = String(arr[i]?.text ?? "").trim();
+      if (!text) continue;
+      const norm = normalized(text);
+      const orig = remaining.get(norm);
+      if (orig && !used.has(orig)) {
+        used.add(orig);
+        remaining.delete(norm);
+        reordered.push({ ...orig, order: i + 1 });
+      } else {
+        reordered.push({
+          id: `step-${i + 1}-${Date.now()}`,
+          order: i + 1,
+          text
+        });
+      }
+    }
+    for (const [, s] of remaining) {
+      reordered.push({ ...s, order: reordered.length + 1 });
+    }
+    return reordered;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("reorderStepsByRecipeLogic error", err);
+    return steps;
   }
 }
 
