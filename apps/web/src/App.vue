@@ -389,7 +389,7 @@ function sourceTypeLabel(source?: ImportSource): string {
     case "SHARE":
       return "Partage";
     case "URL":
-      return "URL";
+      return "Lien";
     case "MANUAL":
       return "Saisie manuelle";
     default:
@@ -402,7 +402,7 @@ function importBusyLabel(type: ImportProgressType | null): string {
     case "share":
       return "Analyse du partage en cours…";
     case "url":
-      return "Analyse de l'URL en cours…";
+      return "Analyse du lien en cours…";
     case "text":
       return "Analyse du texte en cours…";
     case "screenshot":
@@ -413,9 +413,6 @@ function importBusyLabel(type: ImportProgressType | null): string {
       return "Import en cours…";
   }
 }
-
-const shareTargetSupportHint =
-  "Le partage natif vers la PWA fonctionne surtout sur Android (Chrome/Edge, app installée). Sur iOS/Safari et Firefox, copiez l'URL puis utilisez le fallback ci-dessous.";
 
 function formToRecipe(existing?: Recipe): Recipe {
   const now = new Date().toISOString();
@@ -898,7 +895,7 @@ async function consumeShareTargetPayloadFromUrl(): Promise<void> {
 async function runImportFromPasteField(): Promise<void> {
   const content = pasteFieldContent.value.trim();
   if (!content) {
-    setError(new Error("Collez une URL ou du texte à importer."));
+    setError(new Error("Collez un lien ou du texte à importer."));
     return;
   }
 
@@ -1118,7 +1115,7 @@ function fallbackImportMessage(source?: ImportSource): string {
       if (buildInstagramEmbedUrl(source.url)) {
         return "L'extraction du post Instagram est incomplète. Complétez manuellement la recette ; l'aperçu du post/reel reste affiché.";
       }
-      return "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si l'URL est renseignée.";
+      return "L'extraction a échoué (site inaccessible ou rate limit). Complétez manuellement ou utilisez « Réextraire » si le lien est renseigné.";
     default:
       return "L'extraction a échoué. Complétez manuellement la recette.";
   }
@@ -1292,7 +1289,7 @@ async function triggerFullReextract(): Promise<void> {
   try {
     const draft = await bffImportService.importFromUrl(url);
     form.value = draftToForm(draft);
-    feedback.value = "Recette réextraite depuis l'URL.";
+    feedback.value = "Recette réextraite depuis le lien.";
   } catch (err) {
     setError(err);
   } finally {
@@ -1796,21 +1793,19 @@ onUnmounted(() => {
         <p>{{ importBusyLabel(importSourceType) }}</p>
       </div>
 
-      <div class="share-target-hint">
-        <i class="pi pi-share-alt" />
-        <p>{{ shareTargetSupportHint }}</p>
-      </div>
-
       <div class="stack">
-        <label for="paste-field">Collez une URL, du texte ou une image</label>
+        <label for="paste-field">Coller</label>
         <textarea
           id="paste-field"
           v-model="pasteFieldContent"
           class="paste-field"
           rows="4"
-          placeholder="Collez ici une URL, du texte de recette ou une image..."
+          placeholder="Lien, texte ou image"
           @paste="onPasteInField"
         />
+      </div>
+
+      <div class="add-choice-buttons">
         <Button
           label="Importer"
           icon="pi pi-download"
@@ -1820,22 +1815,18 @@ onUnmounted(() => {
         <Button
           label="Coller depuis le presse-papiers"
           icon="pi pi-clipboard"
-          severity="secondary"
           :loading="clipboardBusy"
           :disabled="importBusy"
           @click="importFromClipboardFallback"
         />
-      </div>
-
-      <div class="add-choice-buttons">
         <Button
           label="Saisir à la main"
           icon="pi pi-pencil"
           @click="openCreateForm"
         />
         <Button
-          label="Choisir un fichier"
-          icon="pi pi-folder-open"
+          label="Choisir une photo"
+          icon="pi pi-image"
           :disabled="importBusy"
           @click="triggerFilePick"
         />
