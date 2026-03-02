@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import IngredientImage from "./IngredientImage.vue";
 import type { IngredientLine, Recipe } from "@cookies-et-coquilettes/domain";
 import {
   normalizeIngredientImageId,
-  regenerateIngredientImage,
   storeIngredientImageFromFile
 } from "../services/ingredient-image-service";
 
@@ -23,16 +22,7 @@ const emit = defineEmits<{
 }>();
 
 const displayIngredient = computed(() => props.ingredient);
-const regenerating = ref(false);
-const regenerationError = ref<string | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
-
-watch(
-  () => [props.visible, props.ingredient?.id],
-  () => {
-    if (!props.visible) regenerationError.value = null;
-  }
-);
 
 function close() {
   emit("update:visible", false);
@@ -44,25 +34,6 @@ function getImageId(): string | null {
   const explicitId = ing.imageId?.trim();
   const normalizedId = normalizeIngredientImageId(ing.label);
   return explicitId || normalizedId || null;
-}
-
-async function handleRegenerate() {
-  regenerationError.value = null;
-  const id = getImageId();
-  const label = displayIngredient.value?.label?.trim();
-  if (!id || !label) return;
-  regenerating.value = true;
-  try {
-    const result = await regenerateIngredientImage(id, label);
-    if (result) {
-      emit("imageUpdated");
-    } else {
-      regenerationError.value =
-        "Génération impossible. Le service peut être indisponible (vérifiez OPENAI_API_KEY).";
-    }
-  } finally {
-    regenerating.value = false;
-  }
 }
 
 function triggerFilePick() {
@@ -101,22 +72,7 @@ async function onFilePicked(event: Event) {
     <template v-if="displayIngredient" #default>
       <div class="ingredient-detail-modal-content">
         <div class="ingredient-detail-modal-image">
-          <div
-            v-if="regenerating"
-            class="ingredient-detail-modal-placeholder"
-            aria-live="polite"
-          >
-            Génération de l'image en cours…
-          </div>
-          <div
-            v-else-if="regenerationError"
-            class="ingredient-detail-modal-placeholder ingredient-detail-modal-placeholder--error"
-            aria-live="polite"
-          >
-            {{ regenerationError }}
-          </div>
           <IngredientImage
-            v-else
             :label="displayIngredient.label"
             :image-id="displayIngredient.imageId"
             :refresh-key="refreshKey"
@@ -136,19 +92,10 @@ async function onFilePicked(event: Event) {
         </div>
         <div class="ingredient-detail-modal-actions">
           <Button
-            label="Régénérer"
-            icon="pi pi-sparkles"
-            size="small"
-            :loading="regenerating"
-            :disabled="regenerating"
-            @click="handleRegenerate"
-          />
-          <Button
             label="Choisir une image"
             icon="pi pi-upload"
             size="small"
             severity="secondary"
-            :disabled="regenerating"
             @click="triggerFilePick"
           />
         </div>
@@ -187,25 +134,6 @@ async function onFilePicked(event: Event) {
   width: 14rem;
   height: 14rem;
   max-width: 100%;
-}
-
-.ingredient-detail-modal-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14rem;
-  height: 14rem;
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 0.75rem;
-  color: var(--p-text-muted-color, #6b7280);
-  font-size: 0.95rem;
-  text-align: center;
-  padding: 1rem;
-}
-
-.ingredient-detail-modal-placeholder--error {
-  color: var(--p-error-color, #b91c1c);
-  background: rgba(185, 28, 28, 0.08);
 }
 
 .ingredient-detail-modal-info {

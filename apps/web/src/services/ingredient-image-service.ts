@@ -175,14 +175,6 @@ export async function deleteIngredientImage(id: string): Promise<void> {
   await db.ingredientImages.delete(id);
 }
 
-export async function regenerateIngredientImage(
-  id: string,
-  label: string
-): Promise<string | undefined> {
-  await deleteIngredientImage(id);
-  return generateAndStoreIngredientImage(id, label);
-}
-
 export async function storeIngredientImageFromFile(
   id: string,
   file: File
