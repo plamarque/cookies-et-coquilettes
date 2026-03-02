@@ -55,7 +55,24 @@ L’app est aussi exposée sur le réseau local (0.0.0.0) : au lancement, le scr
 Copier `.env.example` vers `.env` pour le local puis adapter les valeurs.
 
 - Front : `VITE_BFF_URL`, `VITE_BASE_PATH`
-- BFF : `OPENAI_API_KEY` (parsing + génération d'images DALL-E), `CORS_ORIGIN`, `GENERATED_IMAGE_CACHE_DIR` (dossier cache local), `GENERATED_IMAGE_BASE_URL` (URL publique optionnelle pour les liens d'images générées), `GENERATED_IMAGE_ADMIN_TOKEN` (protection endpoints de purge cache), `GENERATED_IMAGE_S3_ENDPOINT`, `GENERATED_IMAGE_S3_REGION`, `GENERATED_IMAGE_S3_BUCKET`, `GENERATED_IMAGE_S3_ACCESS_KEY_ID`, `GENERATED_IMAGE_S3_SECRET_ACCESS_KEY`, `GENERATED_IMAGE_S3_SESSION_TOKEN` et `GENERATED_IMAGE_S3_PREFIX` (stockage objet persistant optionnel S3-compatible)
+- BFF : `OPENAI_API_KEY` (parsing + génération d'images), `CORS_ORIGIN`, `GENERATED_IMAGE_CACHE_DIR`, `GENERATED_IMAGE_BASE_URL`, `GENERATED_IMAGE_ADMIN_TOKEN`, variables S3/R2 (stockage images), et variables **modèles IA** (voir ci-dessous)
+
+### Modèles IA
+
+Les modèles utilisés (images et chat) sont configurables via variables d'environnement. Valeurs par défaut :
+
+| Variable | Défaut | Usage |
+|----------|--------|-------|
+| `AI_IMAGE_MODEL_RECIPE` | gpt-image-1.5 | Photos de recettes |
+| `AI_IMAGE_MODEL_INGREDIENT` | gpt-image-1-mini | Icônes ingrédients |
+| `AI_IMAGE_MODEL_COOKING_STEP` | gpt-image-1-mini | Illustrations étapes cuisine |
+| `AI_IMAGE_QUALITY_*` | low | Qualité (GPT Image : low/medium/high ; DALL-E : standard/hd) |
+| `AI_CHAT_MODEL` | gpt-4o-mini | Modèle par défaut (parsing, timer, réordonnancement) |
+| `AI_CHAT_MODEL_PARSE` | — | Override parsing URL + screenshot |
+| `AI_CHAT_MODEL_STEP_TIMER` | — | Override détection timer étape |
+| `AI_CHAT_MODEL_REORDER` | — | Override réordonnancement des étapes |
+
+Référence tarifs : [OpenAI Pricing](https://developers.openai.com/api/docs/pricing).
 
 ## Prérequis E2E / screenshots
 

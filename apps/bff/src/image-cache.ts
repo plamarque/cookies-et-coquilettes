@@ -240,24 +240,47 @@ async function ensureCacheDir(): Promise<void> {
   await fs.mkdir(CACHE_DIR, { recursive: true });
 }
 
-export function buildRecipeImageCacheKey(input: GenerateRecipeImageInput): string {
-  return keyFromPayload("recipe", {
+export interface ImageCacheKeyOptions {
+  model: string;
+  quality: string;
+}
+
+export function buildRecipeImageCacheKey(
+  input: GenerateRecipeImageInput,
+  options?: ImageCacheKeyOptions
+): string {
+  const payload: Record<string, unknown> = {
     title: normalizeText(input.title),
     ingredients: input.ingredients.map((item) => normalizeText(item.label)).filter(Boolean).slice(0, 20),
     steps: input.steps.map((item) => normalizeText(item.text)).filter(Boolean).slice(0, 20)
-  });
+  };
+  if (options?.model) payload.model = options.model;
+  if (options?.quality) payload.quality = options.quality;
+  return keyFromPayload("recipe", payload);
 }
 
-export function buildIngredientImageCacheKey(input: GenerateIngredientImageInput): string {
-  return keyFromPayload("ingredient", {
+export function buildIngredientImageCacheKey(
+  input: GenerateIngredientImageInput,
+  options?: ImageCacheKeyOptions
+): string {
+  const payload: Record<string, unknown> = {
     label: normalizeText(input.label)
-  });
+  };
+  if (options?.model) payload.model = options.model;
+  if (options?.quality) payload.quality = options.quality;
+  return keyFromPayload("ingredient", payload);
 }
 
-export function buildCookingStepImageCacheKey(input: GenerateCookingStepImageInput): string {
-  return keyFromPayload("cooking-step", {
+export function buildCookingStepImageCacheKey(
+  input: GenerateCookingStepImageInput,
+  options?: ImageCacheKeyOptions
+): string {
+  const payload: Record<string, unknown> = {
     stepText: normalizeText(input.stepText)
-  });
+  };
+  if (options?.model) payload.model = options.model;
+  if (options?.quality) payload.quality = options.quality;
+  return keyFromPayload("cooking-step", payload);
 }
 
 export function buildCachedImageUrl(req: Request, key: string): string {

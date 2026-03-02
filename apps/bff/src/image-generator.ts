@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { getImageModel, getImageQuality } from "./ai-config.js";
+import type { ImageUseCase } from "./ai-config.js";
 
 export interface GenerateRecipeImageInput {
   title: string;
@@ -14,8 +16,43 @@ export interface GenerateCookingStepImageInput {
   stepText: string;
 }
 
+function isGptImageModel(model: string): boolean {
+  return model.startsWith("gpt-image-");
+}
+
+function buildImageParams(useCase: ImageUseCase): {
+  model: string;
+  size: "1024x1024";
+  quality: string;
+  style?: "natural" | "vivid";
+} {
+  const model = getImageModel(useCase);
+  const quality = getImageQuality(useCase);
+
+  const base: { model: string; size: "1024x1024"; quality: string; style?: "natural" | "vivid" } = {
+    model,
+    size: "1024x1024",
+    quality
+  };
+
+  if (isGptImageModel(model)) {
+    return base;
+  }
+
+  if (model.startsWith("dall-e-")) {
+    const dalleQuality: "standard" | "hd" = quality === "hd" ? "hd" : "standard";
+    return {
+      ...base,
+      quality: dalleQuality,
+      style: "natural"
+    };
+  }
+
+  return base;
+}
+
 /**
- * Génère une image de recette via DALL-E 3.
+ * Génère une image de recette via l'API image IA (GPT Image ou DALL-E).
  * Style : flat lay, photo de plat type Instagram, élégant, appétissant.
  */
 export async function generateRecipeImage(
@@ -34,19 +71,30 @@ export async function generateRecipeImage(
 
   const prompt = `Professional flat lay food photography, Instagram-style recipe photo. The dish: "${input.title}". Main ingredients visible: ${ingredientsText || "various"}. Style: elegant, appetizing, on a clean white or neutral background, top-down view, natural lighting, high-end food blog quality. No text in the image.`;
 
+  const { model, size, quality, style } = buildImageParams("recipe");
+
   try {
     const client = new OpenAI({ apiKey });
-    const response = await client.images.generate({
-      model: "dall-e-3",
+    const useGptImage = isGptImageModel(model);
+    const baseOptions = {
+      model,
       prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-      style: "natural",
-      response_format: "url"
-    });
-
-    const url = response.data?.[0]?.url;
+      n: 1 as const,
+      size,
+      quality: quality as "low" | "medium" | "high" | "standard" | "hd",
+      ...(style && { style })
+    };
+    const response = await client.images.generate(
+      useGptImage ? baseOptions : { ...baseOptions, response_format: "url" }
+    );
+    const data = "data" in response ? response.data : undefined;
+    const first = data?.[0];
+    let url: string | undefined;
+    if (useGptImage && first && "b64_json" in first && typeof first.b64_json === "string") {
+      url = `data:image/png;base64,${first.b64_json}`;
+    } else if (first && "url" in first && typeof first.url === "string") {
+      url = first.url;
+    }
     return typeof url === "string" ? url : undefined;
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -73,19 +121,30 @@ export async function generateIngredientImage(
 
   const prompt = `Photorealistic product photo of exactly one cooking ingredient: "${label}". The ingredient must appear only once as the single subject (no duplicates, no repeated pieces). Tight close-up framing, centered, very legible. Pure white seamless background. No cast shadow, no drop shadow, no reflection, no vignette, no gradient background. No staging props, no plate, no utensils, no hands, no packaging brand, no text or labels.`;
 
+  const { model, size, quality, style } = buildImageParams("ingredient");
+
   try {
     const client = new OpenAI({ apiKey });
-    const response = await client.images.generate({
-      model: "dall-e-3",
+    const useGptImage = isGptImageModel(model);
+    const baseOptions = {
+      model,
       prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-      style: "natural",
-      response_format: "url"
-    });
-
-    const url = response.data?.[0]?.url;
+      n: 1 as const,
+      size,
+      quality: quality as "low" | "medium" | "high" | "standard" | "hd",
+      ...(style && { style })
+    };
+    const response = await client.images.generate(
+      useGptImage ? baseOptions : { ...baseOptions, response_format: "url" }
+    );
+    const data = "data" in response ? response.data : undefined;
+    const first = data?.[0];
+    let url: string | undefined;
+    if (useGptImage && first && "b64_json" in first && typeof first.b64_json === "string") {
+      url = `data:image/png;base64,${first.b64_json}`;
+    } else if (first && "url" in first && typeof first.url === "string") {
+      url = first.url;
+    }
     return typeof url === "string" ? url : undefined;
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -112,19 +171,30 @@ export async function generateCookingStepImage(
 
   const prompt = `Cinematic food photography illustration of a single cooking step. Depict this exact step action: "${stepText}". Focus on hands, utensils and ingredients involved in the action, realistic textures, appetizing atmosphere, kitchen context, natural light. No text, no labels, no watermark, no collage, no split-screen.`;
 
+  const { model, size, quality, style } = buildImageParams("cooking_step");
+
   try {
     const client = new OpenAI({ apiKey });
-    const response = await client.images.generate({
-      model: "dall-e-3",
+    const useGptImage = isGptImageModel(model);
+    const baseOptions = {
+      model,
       prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-      style: "natural",
-      response_format: "url"
-    });
-
-    const url = response.data?.[0]?.url;
+      n: 1 as const,
+      size,
+      quality: quality as "low" | "medium" | "high" | "standard" | "hd",
+      ...(style && { style })
+    };
+    const response = await client.images.generate(
+      useGptImage ? baseOptions : { ...baseOptions, response_format: "url" }
+    );
+    const data = "data" in response ? response.data : undefined;
+    const first = data?.[0];
+    let url: string | undefined;
+    if (useGptImage && first && "b64_json" in first && typeof first.b64_json === "string") {
+      url = `data:image/png;base64,${first.b64_json}`;
+    } else if (first && "url" in first && typeof first.url === "string") {
+      url = first.url;
+    }
     return typeof url === "string" ? url : undefined;
   } catch (err) {
     // eslint-disable-next-line no-console

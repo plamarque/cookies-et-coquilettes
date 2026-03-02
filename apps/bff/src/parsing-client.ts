@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import OpenAI from "openai";
+import { getChatModel } from "./ai-config.js";
 import { instagramGetUrl, type InstagramResponse } from "instagram-url-direct";
 import { extractYouTubeVideoId, isYouTubeUrl } from "./youtube-utils.js";
 import type {
@@ -610,7 +611,7 @@ ${text.slice(0, 12000)}`;
 
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: getChatModel("parse"),
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2
     });
@@ -661,7 +662,7 @@ Règles :
 
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: getChatModel("parse"),
       messages: [
         {
           role: "user",
@@ -725,7 +726,7 @@ ${stepTexts}`;
   try {
     const client = new OpenAI({ apiKey });
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: getChatModel("reorder"),
       messages: [{ role: "user", content: prompt }],
       temperature: 0.1
     });

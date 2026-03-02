@@ -36,7 +36,12 @@ Déployer en mode push :
 4. Copier l’URL du Deploy Hook Render dans le secret GitHub :
    - `RENDER_DEPLOY_HOOK_URL`
 
-5. Variables optionnelles pour le cache d'images générées :
+5. Variables optionnelles pour les **modèles IA** (contrôle des coûts) :
+   - `AI_IMAGE_MODEL_RECIPE`, `AI_IMAGE_MODEL_INGREDIENT`, `AI_IMAGE_MODEL_COOKING_STEP` (ex. gpt-image-1.5, gpt-image-1-mini)
+   - `AI_IMAGE_QUALITY_RECIPE`, `AI_IMAGE_QUALITY_INGREDIENT`, `AI_IMAGE_QUALITY_COOKING_STEP` (low, medium, high pour GPT Image)
+   - `AI_CHAT_MODEL`, `AI_CHAT_MODEL_PARSE`, `AI_CHAT_MODEL_STEP_TIMER`, `AI_CHAT_MODEL_REORDER` (ex. gpt-4o-mini)
+
+6. Variables optionnelles pour le cache d'images générées :
    - `GENERATED_IMAGE_CACHE_DIR` (ex. `/opt/render/project/src/.cache/generated-images`)
    - `GENERATED_IMAGE_BASE_URL` (URL publique du BFF pour composer les URLs `GET /api/generated-images/:key`)
    - `GENERATED_IMAGE_ADMIN_TOKEN` (token requis pour les endpoints de purge admin)

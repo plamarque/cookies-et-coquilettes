@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getChatModel } from "./ai-config.js";
 
 interface DurationCandidate {
   index: number;
@@ -131,7 +132,7 @@ ${stepText.slice(0, 2000)}`;
   try {
     const client = new OpenAI({ apiKey });
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: getChatModel("step_timer"),
       temperature: 0,
       messages: [{ role: "user", content: prompt }]
     });

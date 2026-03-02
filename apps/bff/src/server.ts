@@ -18,6 +18,7 @@ import {
   getCachedImageByKey,
   resolveCachedImageUrl
 } from "./image-cache.js";
+import { getImageModel, getImageQuality } from "./ai-config.js";
 import {
   generateCookingStepImage,
   generateIngredientImage,
@@ -199,7 +200,8 @@ app.post("/api/generate-recipe-image", async (req, res) => {
       : []
   };
 
-  const cacheKey = buildRecipeImageCacheKey(input);
+  const imageOpts = { model: getImageModel("recipe"), quality: getImageQuality("recipe") };
+  const cacheKey = buildRecipeImageCacheKey(input, imageOpts);
   const imageUrl = await resolveCachedImageUrl(cacheKey, req, () => generateRecipeImage(input));
 
   if (!imageUrl) {
@@ -218,7 +220,8 @@ app.post("/api/generate-ingredient-image", async (req, res) => {
   }
 
   const input = { label: label.trim() };
-  const cacheKey = buildIngredientImageCacheKey(input);
+  const imageOpts = { model: getImageModel("ingredient"), quality: getImageQuality("ingredient") };
+  const cacheKey = buildIngredientImageCacheKey(input, imageOpts);
   const imageUrl = await resolveCachedImageUrl(cacheKey, req, () =>
     generateIngredientImage(input)
   );
@@ -238,7 +241,8 @@ app.post("/api/generate-cooking-step-image", async (req, res) => {
   }
 
   const input = { stepText: stepText.trim() };
-  const cacheKey = buildCookingStepImageCacheKey(input);
+  const imageOpts = { model: getImageModel("cooking_step"), quality: getImageQuality("cooking_step") };
+  const cacheKey = buildCookingStepImageCacheKey(input, imageOpts);
   const imageUrl = await resolveCachedImageUrl(cacheKey, req, () =>
     generateCookingStepImage(input)
   );
@@ -296,7 +300,8 @@ app.post("/api/admin/generated-images/purge-ingredient", async (req, res) => {
     return;
   }
 
-  const key = buildIngredientImageCacheKey({ label });
+  const imageOpts = { model: getImageModel("ingredient"), quality: getImageQuality("ingredient") };
+  const key = buildIngredientImageCacheKey({ label }, imageOpts);
   const deleted = await deleteCachedImageByKey(key);
   res.json({ key, label, deleted });
 });
