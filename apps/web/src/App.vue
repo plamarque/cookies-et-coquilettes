@@ -2068,9 +2068,6 @@ onUnmounted(() => {
                       />
                     </button>
                   </template>
-                  <span v-else class="cooking-step-ingredients-empty">
-                    Aucun ingrédient détecté automatiquement.
-                  </span>
                 </div>
                 <button
                   type="button"
