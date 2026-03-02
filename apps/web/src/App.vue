@@ -1825,7 +1825,7 @@ onUnmounted(() => {
           @click="openCreateForm"
         />
         <Button
-          label="Choisir une photo"
+          label="Choisir une image"
           icon="pi pi-image"
           :disabled="importBusy"
           @click="triggerFilePick"
