@@ -2043,6 +2043,16 @@ onUnmounted(() => {
             allowfullscreen
           />
         </div>
+        <div v-else-if="selectedRecipeInstagramEmbedUrl" class="recipe-detail-embed-wrapper">
+          <iframe
+            :src="selectedRecipeInstagramEmbedUrl"
+            title="Aperçu Instagram"
+            class="recipe-detail-instagram-embed"
+            loading="lazy"
+            allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+            allowfullscreen
+          />
+        </div>
         <RecipeImage
           v-else-if="selectedRecipe.imageId"
           :image-id="selectedRecipe.imageId"
@@ -2053,16 +2063,6 @@ onUnmounted(() => {
           class="recipe-detail-image-placeholder recipe-detail-image-placeholder--loading"
         >
           {{ imageLoadingMessage }}
-        </div>
-        <div v-else-if="selectedRecipeInstagramEmbedUrl" class="recipe-detail-embed-wrapper">
-          <iframe
-            :src="selectedRecipeInstagramEmbedUrl"
-            title="Aperçu Instagram"
-            class="recipe-detail-instagram-embed"
-            loading="lazy"
-            allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
-            allowfullscreen
-          />
         </div>
         <div v-else class="recipe-detail-image-placeholder" />
         <button
@@ -2253,6 +2253,17 @@ onUnmounted(() => {
           />
           <small class="muted">Aperçu de la vidéo YouTube importée.</small>
         </div>
+        <div v-else-if="formInstagramEmbedUrl" class="recipe-form-embed-wrapper">
+          <iframe
+            :src="formInstagramEmbedUrl"
+            title="Aperçu Instagram"
+            class="recipe-form-instagram-embed"
+            loading="lazy"
+            allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+            allowfullscreen
+          />
+          <small class="muted">Aperçu du post/reel Instagram importé.</small>
+        </div>
         <div v-else-if="form.imageUrl || (form.imageId && typeof form.imageId === 'string')" class="row recipe-form-image-row">
           <RecipeImage
             v-if="form.imageId && typeof form.imageId === 'string'"
@@ -2296,17 +2307,6 @@ onUnmounted(() => {
           <span>{{ imageReextracting ? "Extraction de la recette en cours…" : "Génération de l'image en cours…" }}</span>
         </div>
         <div v-else class="stack recipe-form-media-fallback">
-          <div v-if="formInstagramEmbedUrl" class="recipe-form-embed-wrapper">
-            <iframe
-              :src="formInstagramEmbedUrl"
-              title="Aperçu Instagram"
-              class="recipe-form-instagram-embed"
-              loading="lazy"
-              allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
-              allowfullscreen
-            />
-            <small class="muted">Aperçu du post/reel Instagram importé.</small>
-          </div>
           <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
             <Button
               text

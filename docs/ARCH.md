@@ -67,7 +67,7 @@ Règles de contrat :
 - pour un payload `SHARE` contenant une URL, priorité à l’extraction depuis l’URL partagée,
 - la `source` d’import est persistée avec `type + capturedAt` même quand `url` est absente,
 - en indisponibilité BFF/parsing, retour d’un draft fallback éditable,
-- pour une source Instagram sans image locale, l’UI affiche un embed `post/reel` basé sur l’URL source.
+- pour les sources YouTube et Instagram (post/reel), l’UI affiche l’embed en priorité dans la fiche recette et le formulaire ; le poster (thumbnail) est utilisé pour les cartes ; le bouton overlay « Cuisiner » est masqué sur les embeds vidéo.
 
 ### Cooking mode service
 
@@ -125,7 +125,7 @@ Ordre de priorité côté BFF :
 4. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
 5. **Fallback** — draft minimal éditable.
 
-L'image est extraite via le scraper Instagram (URLs Instagram), via oEmbed/og:image (URLs YouTube), sinon via le champ `image` du JSON-LD ou la balise `og:image`. Le front télécharge l'image à la sauvegarde et la stocke dans IndexedDB. Pour les sources YouTube sans image locale, l'interface affiche un embed vidéo (ratio 16:9).
+L'image (poster) est extraite via le scraper Instagram (URLs Instagram, thumbnail pour les reels), via oEmbed (URLs YouTube), sinon via le champ `image` du JSON-LD ou la balise `og:image`. Le front télécharge l'image à la sauvegarde et la stocke dans IndexedDB. Pour les sources YouTube et Instagram (post/reel), l'interface affiche l'embed en priorité dans la fiche recette et le formulaire ; le poster est réservé aux cartes.
 
 **Génération automatique** : lorsqu'aucune image n'est extraite, le BFF peut générer une image via une API IA (ex. DALL-E) à partir du titre, des ingrédients et des étapes. Style : photo de plat type Instagram, flat lay, élégant. Le front affiche un placeholder pendant la génération ; une fois l'URL reçue, l'image est téléchargée et stockée localement.
 

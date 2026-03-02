@@ -210,6 +210,64 @@ test.describe("Cookies & Coquillettes v1", () => {
     await expect(recipeCard.locator(".recipe-card-image")).toBeVisible({ timeout: 15000 });
   });
 
+  test("import Instagram Reel : description, ingrédients, embed, poster, pas d'overlay Cuisiner", async ({
+    page
+  }) => {
+    test.setTimeout(60000); // BFF + Instagram scraper + OpenAI peuvent prendre du temps
+    const instagramUrl = "https://www.instagram.com/reel/DSQHEVSjRUr/";
+
+    let bffOk = false;
+    try {
+      const r = await fetch("http://localhost:8787/health");
+      bffOk = r.ok;
+    } catch {
+      /* BFF non démarré */
+    }
+    test.skip(!bffOk, "BFF non disponible - lancer npm run dev:bff dans un terminal séparé");
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Nouvelle recette" }).click();
+    await expect(page.getByRole("heading", { name: "Nouvelle recette" })).toBeVisible();
+
+    await page.locator("#paste-field").fill(instagramUrl);
+    await page.getByRole("button", { name: "Importer" }).click();
+
+    // Succès complet ou fallback (scraper Instagram peut échouer/être limité)
+    await expect(page.locator(".message.success")).toContainText(
+      /Recette importée|extraction du post Instagram est incomplète/i,
+      { timeout: 30000 }
+    );
+    await expect(
+      page.locator("section.panel.detail, section.panel.form-panel")
+    ).toBeVisible({ timeout: 5000 });
+
+    // Embed Instagram visible (détail ou formulaire)
+    await expect(page.locator("iframe.recipe-detail-instagram-embed, iframe.recipe-form-instagram-embed")).toBeVisible();
+    await expect(page.locator("iframe[title='Aperçu Instagram']")).toHaveAttribute(
+      "src",
+      /instagram\.com\/reel\/DSQHEVSjRUr\/embed/
+    );
+
+    const inDetail = (await page.locator("section.panel.detail").count()) > 0;
+    if (inDetail) {
+      // Pas de bouton overlay "Cuisiner" par-dessus l'embed
+      await expect(page.locator(".recipe-detail-play-overlay")).toHaveCount(0);
+      await expect(page.locator(".recipe-detail-cuisiner-primary")).toBeVisible();
+      const ingredientLines = page.locator(".ingredient-line");
+      await expect(ingredientLines.first()).toBeVisible({ timeout: 5000 });
+      const recipeTitle = (await page.locator(".recipe-detail-title").textContent())?.trim() ?? "";
+      await page.getByRole("button", { name: "Retour" }).click();
+      const recipeCard = recipeTitle
+        ? page.locator(".recipe-card", { hasText: recipeTitle }).first()
+        : page.locator(".recipe-card").first();
+      await expect(recipeCard).toBeVisible();
+      await expect(recipeCard.locator(".recipe-card-image")).toBeVisible({ timeout: 15000 });
+    } else {
+      // Fallback : formulaire avec embed, pas d'overlay (on est dans le form)
+      await expect(page.locator(".recipe-form-instagram-embed")).toBeVisible();
+    }
+  });
+
   test("image recette : affichage sur carte, détail, formulaire et suppression", async ({
     page
   }) => {
