@@ -530,25 +530,28 @@ body {
 
 .cooking-step-timer {
   position: absolute;
-  right: 0.65rem;
-  top: 0.65rem;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(10rem, 40%);
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.34rem;
-  padding: 0.45rem;
-  border-radius: 0.85rem;
-  background: rgba(16, 22, 20, 0.5);
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border-radius: 0 0.85rem 0.85rem 0;
+  background: #0e1311;
   color: #fff;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.25);
   isolation: isolate;
   contain: layout paint;
 }
 
 .cooking-step-timer-visual {
   --timer-progress: 360deg;
-  width: 5.35rem;
+  width: min(6.5rem, 65%);
   aspect-ratio: 1;
   border-radius: 50%;
   position: relative;
@@ -558,26 +561,26 @@ body {
   background:
     conic-gradient(
       from -90deg,
-      rgba(255, 255, 255, 0.52) 0deg,
-      rgba(255, 255, 255, 0.52) var(--timer-progress),
-      rgba(255, 255, 255, 0.17) var(--timer-progress),
-      rgba(255, 255, 255, 0.17) 360deg
+      rgba(255, 255, 255, 0.55) 0deg,
+      rgba(255, 255, 255, 0.55) var(--timer-progress),
+      rgba(255, 255, 255, 0.2) var(--timer-progress),
+      rgba(255, 255, 255, 0.2) 360deg
     );
 }
 
 .cooking-step-timer-visual::before {
   content: "";
   position: absolute;
-  inset: 0.58rem;
+  inset: 0.65rem;
   border-radius: 50%;
-  background: rgba(14, 19, 17, 0.78);
+  background: #0e1311;
 }
 
 .cooking-step-timer-time {
   position: relative;
   z-index: 1;
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -585,31 +588,31 @@ body {
 
 .cooking-step-timer-label {
   margin: 0;
-  max-width: 7.5rem;
+  max-width: 100%;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.95);
+  color: #fff;
 }
 
 .cooking-step-timer-actions {
   display: flex;
-  gap: 0.24rem;
+  gap: 0.4rem;
 }
 
 .cooking-step-timer-action.p-button {
-  width: 1.95rem;
-  min-width: 1.95rem;
-  height: 1.95rem;
-  min-height: 1.95rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
   border-radius: 999px !important;
-  font-size: 0.72rem !important;
+  font-size: 0.9rem !important;
   padding: 0 !important;
 }
 
 .cooking-step-timer-action .p-button-icon {
   margin-right: 0 !important;
-  font-size: 0.82rem;
+  font-size: 1.1rem;
 }
 
 .cooking-step-timer-action--primary.p-button {
@@ -1019,36 +1022,33 @@ body {
   }
 
   .cooking-step-timer {
-    right: 0.45rem;
-    top: 0.45rem;
-    gap: 0.25rem;
-    padding: 0.34rem;
-    border-radius: 0.72rem;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-radius: 0 0.72rem 0.72rem 0;
   }
 
   .cooking-step-timer-visual {
-    width: 4.45rem;
+    width: min(5.5rem, 60%);
   }
 
   .cooking-step-timer-visual::before {
-    inset: 0.5rem;
+    inset: 0.55rem;
   }
 
   .cooking-step-timer-time {
-    font-size: 0.86rem;
+    font-size: 1.25rem;
   }
 
   .cooking-step-timer-label {
-    max-width: 6.1rem;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
 
   .cooking-step-timer-action.p-button {
-    width: 1.72rem;
-    min-width: 1.72rem;
-    height: 1.72rem;
-    min-height: 1.72rem;
-    font-size: 0.64rem !important;
+    width: 2.6rem;
+    min-width: 2.6rem;
+    height: 2.6rem;
+    min-height: 2.6rem;
+    font-size: 0.85rem !important;
     padding: 0 !important;
   }
 
