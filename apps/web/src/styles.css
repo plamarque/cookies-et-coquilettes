@@ -759,8 +759,8 @@ body {
 }
 
 .ingredient-icon--cooking-step {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.8rem;
+  height: 2.8rem;
 }
 
 .cooking-step-ingredients-empty {
@@ -1049,27 +1049,27 @@ body {
   }
 
   .cooking-fullscreen-overlay {
-    gap: 0.75rem;
+    gap: 0.5rem;
     padding:
-      calc(0.75rem + env(safe-area-inset-top))
+      calc(0.6rem + env(safe-area-inset-top))
       0.75rem
       calc(0.9rem + env(safe-area-inset-bottom));
   }
 
   .cooking-fullscreen-media-image {
-    max-height: 31vh;
-    min-height: 145px;
+    max-height: 22vh;
+    min-height: 100px;
   }
 
   .cooking-fullscreen-media-placeholder {
-    min-height: 145px;
-    max-height: 31vh;
+    min-height: 100px;
+    max-height: 22vh;
   }
 
   .cooking-step-text--fullscreen {
-    padding: 1rem;
-    font-size: clamp(1.75rem, 8.7vw, 2.4rem);
-    line-height: 1.5;
+    padding: 0.8rem 0.9rem;
+    font-size: clamp(1.6rem, 8vw, 2.2rem);
+    line-height: 1.45;
   }
 
   .cooking-step-image-loading {
@@ -1109,13 +1109,36 @@ body {
     padding: 0 !important;
   }
 
+  .cooking-step-body {
+    gap: 0.35rem;
+  }
+
+  .cooking-fullscreen-all-ingredients {
+    padding-top: 0.3rem;
+    max-height: 40vh;
+  }
+
   .cooking-step-ingredients-row {
     gap: 0.4rem;
   }
 
   .ingredient-icon--cooking-step {
-    width: 2rem;
-    height: 2rem;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .cooking-fullscreen-all-ingredients .ingredient-grid {
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+    gap: 0.6rem;
+  }
+
+  .cooking-fullscreen-all-ingredients .ingredient-card-name {
+    font-size: 0.88rem;
+  }
+
+  .cooking-fullscreen-all-ingredients .ingredient-card-image-wrap .ingredient-card-img-fallback {
+    min-height: 3.5rem;
+    font-size: 1.4rem;
   }
 
   .cooking-step-see-all {
