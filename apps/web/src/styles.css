@@ -834,15 +834,10 @@ body {
 
 .cooking-fullscreen-all-ingredients {
   margin: 0;
-  padding: 0 0 0 1rem;
-  max-height: 24vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.98rem;
-  border-top: 1px solid rgba(31, 79, 70, 0.12);
   padding-top: 0.55rem;
+  max-height: 28vh;
+  overflow-y: auto;
+  border-top: 1px solid rgba(31, 79, 70, 0.12);
 }
 
 .recipe-form-image {
@@ -1505,8 +1500,6 @@ body {
   font-size: clamp(0.9rem, 1.5vw, 1rem);
   font-weight: 500;
   line-height: 1.3;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
   color: #1d1f1c;
 }
 

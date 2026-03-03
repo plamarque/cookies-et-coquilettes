@@ -2097,14 +2097,35 @@ onUnmounted(() => {
                   {{ showCookingIngredients ? "Masquer" : "Voir tous" }}
                 </button>
               </div>
-              <ul v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
-                <li v-for="ingredient in selectedRecipeIngredientsSorted" :key="ingredient.id">
-                  <strong>{{ ingredient.label }}</strong>
-                  <span v-if="ingredient.quantity !== undefined">
-                    : {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
-                  </span>
-                </li>
-              </ul>
+              <div v-if="showCookingIngredients" class="cooking-fullscreen-all-ingredients">
+                <div class="ingredient-grid">
+                  <button
+                    v-for="ingredient in selectedRecipeIngredientsSorted"
+                    :key="ingredient.id"
+                    type="button"
+                    class="ingredient-card"
+                    :aria-label="`Voir les détails de ${ingredient.label}`"
+                    @click="openIngredientModal(ingredient)"
+                    @keydown.enter="openIngredientModal(ingredient)"
+                    @keydown.space.prevent="openIngredientModal(ingredient)"
+                  >
+                    <div class="ingredient-card-image-wrap">
+                      <IngredientImage
+                        :label="ingredient.label"
+                        :image-id="ingredient.imageId"
+                        :refresh-key="ingredientImageRefreshKey"
+                        img-class="ingredient-card-img"
+                        fallback-class="ingredient-card-img-fallback"
+                        :alt="`Ingrédient ${ingredient.label}`"
+                      />
+                    </div>
+                    <span class="ingredient-card-name">{{ ingredient.label }}</span>
+                    <span v-if="ingredient.quantity !== undefined" class="ingredient-card-qty">
+                      {{ ingredient.quantity }} {{ ingredient.unit ?? "" }}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="cooking-step-footer">
