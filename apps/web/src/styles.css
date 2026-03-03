@@ -548,6 +548,22 @@ body {
   flex-shrink: 0;
 }
 
+/* Hauteur minimale pour que le timer reste visible et utilisable quand le placeholder
+   "Ajouter une image" est affiché (plus court qu'une vraie image). */
+.cooking-fullscreen-media-zone--with-timer {
+  min-height: 220px;
+}
+
+.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-image,
+.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-placeholder {
+  min-height: 100%;
+  height: 100%;
+}
+
+.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-image {
+  object-fit: cover;
+}
+
 .cooking-fullscreen-media-image {
   width: 100%;
   min-height: 170px;
@@ -1064,6 +1080,10 @@ body {
   .cooking-fullscreen-media-placeholder {
     min-height: 100px;
     max-height: 22vh;
+  }
+
+  .cooking-fullscreen-media-zone--with-timer {
+    min-height: 190px;
   }
 
   .cooking-step-text--fullscreen {

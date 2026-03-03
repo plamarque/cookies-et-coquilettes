@@ -1998,7 +1998,10 @@ onUnmounted(() => {
             />
           </div>
 
-          <div class="cooking-fullscreen-media-zone">
+          <div
+            class="cooking-fullscreen-media-zone"
+            :class="{ 'cooking-fullscreen-media-zone--with-timer': hasCurrentStepTimer }"
+          >
             <img
               v-if="currentCookingStepImageUrl"
               :src="currentCookingStepImageUrl"
