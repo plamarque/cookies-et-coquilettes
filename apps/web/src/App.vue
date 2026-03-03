@@ -138,7 +138,7 @@ const selectedIngredientForModal = ref<IngredientLine | null>(null);
 const ingredientModalVisible = ref(false);
 const ingredientImageRefreshKey = ref(0);
 
-const FEATURE_PORTIONS_ENABLED = false;
+const FEATURE_PORTIONS_ENABLED = true;
 const baseUrl = import.meta.env.BASE_URL;
 const INGREDIENT_TOKEN_STOPWORDS = new Set([
   "de",
@@ -189,8 +189,10 @@ function emptyForm(): RecipeFormState {
   };
 }
 
-function parseNumber(value: string): number | undefined {
-  const normalized = value.trim().replace(",", ".");
+function parseNumber(value: string | number | undefined | null): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value);
+  const normalized = str.trim().replace(",", ".");
   if (!normalized) {
     return undefined;
   }
@@ -1661,11 +1663,16 @@ async function scaleToInput(recipe: Recipe): Promise<void> {
   }
 }
 
-async function resetServings(recipe: Recipe): Promise<void> {
-  if (!recipe.servingsBase) {
-    return;
-  }
-  servingsInput.value = String(recipe.servingsBase);
+async function decrementServings(recipe: Recipe): Promise<void> {
+  const n = parseNumber(servingsInput.value);
+  if (!n || n <= 1) return;
+  servingsInput.value = String(n - 1);
+  await scaleToInput(recipe);
+}
+
+async function incrementServings(recipe: Recipe): Promise<void> {
+  const n = parseNumber(servingsInput.value) ?? 0;
+  servingsInput.value = String(n + 1);
   await scaleToInput(recipe);
 }
 
@@ -2258,12 +2265,38 @@ onUnmounted(() => {
         Source : {{ sourceTypeLabel(selectedRecipe.source) }}
       </p>
 
-      <!-- Portions UI masquée (slice K) ; réactiver avec v-if="FEATURE_PORTIONS_ENABLED && selectedRecipe.servingsBase" -->
-      <div v-if="false" class="servings-tools">
+      <!-- Portions UI (slice K) : visible si la recette a un servingsBase -->
+      <div v-if="FEATURE_PORTIONS_ENABLED && selectedRecipe.servingsBase" class="servings-tools">
         <label for="servings-input">Portions</label>
-        <input id="servings-input" v-model="servingsInput" type="number" min="1" step="1" />
-        <Button label="Appliquer" @click="scaleToInput(selectedRecipe)" />
-        <Button label="Reset base" text @click="resetServings(selectedRecipe)" />
+        <div class="servings-stepper">
+          <button
+            type="button"
+            class="servings-stepper-btn"
+            aria-label="Diminuer le nombre de portions"
+            :disabled="!parseNumber(servingsInput) || parseNumber(servingsInput) <= 1"
+            @click="decrementServings(selectedRecipe)"
+          >
+            −
+          </button>
+          <input
+            id="servings-input"
+            v-model="servingsInput"
+            type="number"
+            min="1"
+            step="1"
+            class="servings-stepper-input"
+            aria-label="Nombre de portions"
+            @change="scaleToInput(selectedRecipe)"
+          />
+          <button
+            type="button"
+            class="servings-stepper-btn"
+            aria-label="Augmenter le nombre de portions"
+            @click="incrementServings(selectedRecipe)"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <h3>Ingrédients</h3>
@@ -2481,7 +2514,6 @@ onUnmounted(() => {
 
       <div class="row form-row-category-portions">
         <div class="stack">
-          <span class="form-label">Catégorie Sucré / Salé</span>
           <div class="row category-radios">
             <label class="radio-line">
               <input v-model="form.category" type="radio" value="SUCRE" />
@@ -2499,12 +2531,18 @@ onUnmounted(() => {
         </div>
         <div class="row form-row-prep-cook">
           <div class="stack">
-            <label for="prepTime">Préparation (min)</label>
-            <input id="prepTime" v-model="form.prepTimeMin" type="number" min="1" step="1" class="time-input" />
+            <label for="prepTime">Préparation</label>
+            <span class="time-input-wrap">
+              <input id="prepTime" v-model="form.prepTimeMin" type="number" min="1" step="1" class="time-input" />
+              min
+            </span>
           </div>
           <div class="stack">
-            <label for="cookTime">Cuisson (min)</label>
-            <input id="cookTime" v-model="form.cookTimeMin" type="number" min="1" step="1" class="time-input" />
+            <label for="cookTime">Cuisson</label>
+            <span class="time-input-wrap">
+              <input id="cookTime" v-model="form.cookTimeMin" type="number" min="1" step="1" class="time-input" />
+              min
+            </span>
           </div>
         </div>
       </div>

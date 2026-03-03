@@ -1217,8 +1217,13 @@ body {
 
 .form-row-category-portions {
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.form-row-category-portions > .stack {
+  margin-bottom: 0;
 }
 
 .form-row-portions-times {
@@ -1240,9 +1245,16 @@ body {
   margin-bottom: 0;
 }
 
+.time-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
 .time-input {
-  width: 6ch;
-  max-width: 6ch;
+  width: 7ch;
 }
 
 .radio-line {
@@ -1312,9 +1324,72 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin: 1rem 0;
 }
+
+.servings-tools label {
+  font-weight: 600;
+}
+
+.servings-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--p-input-border-color, #ced4da);
+  border-radius: var(--p-border-radius, 0.375rem);
+  overflow: hidden;
+}
+
+.servings-stepper-btn {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--p-primary-color, #22c55e);
+  background: var(--p-surface-0, #fff);
+  border: none;
+  border-right: 1px solid var(--p-input-border-color, #ced4da);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.servings-stepper-btn:last-of-type {
+  border-right: none;
+  border-left: 1px solid var(--p-input-border-color, #ced4da);
+}
+
+.servings-stepper-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.servings-stepper-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.servings-stepper-input {
+  width: 3ch;
+  min-width: 2.5rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 1rem;
+  text-align: center;
+  border: none;
+  border-radius: 0;
+}
+
+.servings-stepper-input::-webkit-inner-spin-button,
+.servings-stepper-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.servings-stepper-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 
 .ingredient-list {
   list-style: none;

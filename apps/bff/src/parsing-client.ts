@@ -62,7 +62,7 @@ function parseServings(value: unknown): number | undefined {
 }
 
 const UNIT_PATTERN =
-  /(?:litres?|g(?:r?)?|kg|ml|cl|L|cuillère[s]?\s+à\s+soupe|cuillère[s]?\s+à\s+café|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cc|cs|CC|pincée|œuf|oeuf|oeufs|œufs|unité|unités|pièce|pièces|tranche|tranches|feuille|feuilles)/i;
+  /(?:litres?|g(?:r?)?|kg|ml|cl|L|cuillère[s]?\s+à\s+soupe|cuillère[s]?\s+à\s+café|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cc|cs|CC|pincée|œufs|oeufs|œuf|oeuf|unités|unité|pièces|pièce|tranches|tranche|feuilles|feuille|verres|verre|oignons|oignon|pavés|pavé|gousses|gousse)/i;
 
 const QTY_PATTERN = /(\d*\/\d+|\d+(?:[.,]\d+)?|demi|½|⅓|⅔|¼|¾)/;
 
@@ -137,9 +137,7 @@ function parseIngredientFromRaw(raw: string, id: string): IngredientLine {
     const label = qtyFirstMatch[3]?.trim() || trimmed;
     if (qty !== undefined) {
       const unit = rawUnit ? normalizeUnit(rawUnit) : undefined;
-      const isScalable =
-        unit !== undefined &&
-        !/pincée|sel|poivre|à volonté/i.test(unit + label);
+      const isScalable = !/pincée|sel|poivre|à volonté/i.test((unit ?? "") + " " + label);
       return {
         id,
         label,
@@ -603,7 +601,7 @@ Extrais les champs suivants au format JSON (réponds uniquement avec du JSON val
   "ingredients": [{"label": "nom", "quantity": nombre ou null, "unit": "unité", "isScalable": true/false}],
   "steps": [{"order": 1, "text": "description étape"}]
 }
-Pour les ingrédients : quantity et unit optionnels. Reconnaître : g/gr (grammes), CC/c à c (cuillère à café), c à s (cuillère à soupe), fractions (1/2 = demi). isScalable=true si la quantité peut être ajustée (ex: farine), false pour "sel", "poivre", "à volonté".
+Pour les ingrédients : quantity et unit optionnels. Reconnaître : g/gr (grammes), CC/c à c (cuillère à café), c à s (cuillère à soupe), fractions (1/2 = demi), verre, oignon, pavé, etc. isScalable=true par défaut dès qu'il y a une quantité numérique (farine, œufs, pavés de saumon, verre de vin, oignons), false uniquement pour "sel", "poivre", "pincée", "à volonté".
 Pour les étapes : extraire toute préparation ou instructions présentes (même partielles). Si le texte ne contient que des ingrédients, mettre steps: [].
 Texte à analyser :
 
@@ -658,6 +656,7 @@ Règles :
 - Extraire uniquement ce qui est lisible sur l'image.
 - Si une valeur n'est pas lisible, mettre null (ou [] pour listes).
 - Conserver les ingrédients en français quand possible.
+- isScalable=true par défaut dès qu'il y a une quantité (pavés, verre, oignons, etc.), false uniquement pour sel, poivre, pincée, à volonté.
 - IMPORTANT pour les étapes : si des numéros sont affichés sur l'image (badges, encadrés), les respecter strictement. Utiliser ces numéros comme "order" ET les inclure au début du texte (ex. "25. Égaliser les bords..."). Sinon, ordre de lecture (1, 2, 3...).`;
 
   try {
