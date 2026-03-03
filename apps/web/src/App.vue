@@ -1502,18 +1502,12 @@ async function deleteRecipe(recipe: Recipe): Promise<void> {
 }
 
 function formatRecipeTime(recipe: Recipe): string {
-  const prep = recipe.prepTimeMin;
-  const cook = recipe.cookTimeMin;
-  if (prep && cook) {
-    return `${prep} min préparation, ${cook} min cuisson`;
-  }
-  if (prep) {
-    return `${prep} min préparation`;
-  }
-  if (cook) {
-    return `${cook} min cuisson`;
-  }
-  return "";
+  const total = (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0);
+  if (total <= 0) return "";
+  if (total < 60) return `${total}'`;
+  const h = Math.floor(total / 60);
+  const min = total % 60;
+  return min > 0 ? `${h}h${String(min).padStart(2, "0")}` : `${h}h`;
 }
 
 function formatElapsedCookingTime(elapsedMilliseconds: number): string {
@@ -1852,7 +1846,10 @@ onUnmounted(() => {
           </template>
           <template #title>{{ recipe.title }}</template>
           <template #subtitle>
-            {{ formatRecipeTime(recipe) }}
+            <span v-if="formatRecipeTime(recipe)" class="recipe-card-time">
+              <i class="pi pi-stopwatch recipe-card-time-icon" aria-hidden="true" />
+              {{ formatRecipeTime(recipe) }}
+            </span>
           </template>
           <template #content>
             <div class="recipe-card-content">

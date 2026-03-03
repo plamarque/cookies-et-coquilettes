@@ -110,6 +110,19 @@ body {
   color: #3e4b46;
 }
 
+.recipe-card-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  color: #3e4b46;
+}
+
+.recipe-card-time-icon {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
 .recipe-card-content {
   display: flex;
   flex-direction: column;
