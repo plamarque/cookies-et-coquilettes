@@ -2192,7 +2192,7 @@ onUnmounted(() => {
           v-if="!selectedRecipeYouTubeEmbedUrl && !selectedRecipeInstagramEmbedUrl"
           type="button"
           class="recipe-detail-play-overlay"
-          :aria-label="cookingState === 'OFF' ? 'Lancer le mode cuisine' : 'Désactiver le mode cuisine'"
+          :aria-label="cookingState === 'OFF' ? 'Cuisiner' : 'Désactiver le mode cuisine'"
           :title="cookingState === 'OFF' ? 'Cuisiner' : 'Quitter le mode cuisine'"
           @click="toggleCookingMode"
         >
@@ -2351,42 +2351,44 @@ onUnmounted(() => {
       />
 
       <h3>Préparation</h3>
-      <div
-        v-if="
-          (selectedRecipe?.prepTimeMin ?? 0) +
-            (selectedRecipe?.cookTimeMin ?? 0) +
-            (selectedRecipe?.restTimeMin ?? 0) >
-          0
-        "
-        class="recipe-time-encart"
-      >
-        <div class="recipe-time-total">
-          Temps total :
-          {{
-            formatRecipeTime(selectedRecipe!)
-          }}
+      <div class="recipe-time-encart">
+        <div
+          v-if="
+            (selectedRecipe?.prepTimeMin ?? 0) +
+              (selectedRecipe?.cookTimeMin ?? 0) +
+              (selectedRecipe?.restTimeMin ?? 0) >
+            0
+          "
+          class="recipe-time-content"
+        >
+          <div class="recipe-time-total">
+            Temps total :
+            {{
+              formatRecipeTime(selectedRecipe!)
+            }}
+          </div>
+          <div class="recipe-time-breakdown">
+            <span v-if="selectedRecipe?.prepTimeMin" class="recipe-time-col">
+              Préparation : {{ selectedRecipe.prepTimeMin }} min
+            </span>
+            <span v-if="selectedRecipe?.restTimeMin" class="recipe-time-col">
+              Repos : {{ selectedRecipe.restTimeMin }} min
+            </span>
+            <span v-if="selectedRecipe?.cookTimeMin" class="recipe-time-col">
+              Cuisson : {{ selectedRecipe.cookTimeMin }} min
+            </span>
+          </div>
         </div>
-        <div class="recipe-time-breakdown">
-          <span v-if="selectedRecipe?.prepTimeMin" class="recipe-time-col">
-            Préparation : {{ selectedRecipe.prepTimeMin }} min
-          </span>
-          <span v-if="selectedRecipe?.restTimeMin" class="recipe-time-col">
-            Repos : {{ selectedRecipe.restTimeMin }} min
-          </span>
-          <span v-if="selectedRecipe?.cookTimeMin" class="recipe-time-col">
-            Cuisson : {{ selectedRecipe.cookTimeMin }} min
-          </span>
-        </div>
+        <Button
+          :icon="cookingState === 'OFF' ? 'pi pi-play' : 'pi pi-sun'"
+          :label="cookingState === 'OFF' ? 'Cuisiner' : 'Quitter le mode cuisine'"
+          class="recipe-detail-cuisiner-primary"
+          size="large"
+          :severity="cookingState === 'OFF' ? 'primary' : 'secondary'"
+          aria-label="Activer ou désactiver le mode cuisine"
+          @click="toggleCookingMode"
+        />
       </div>
-      <Button
-        :icon="cookingState === 'OFF' ? 'pi pi-play' : 'pi pi-sun'"
-        :label="cookingState === 'OFF' ? 'Lancer le mode cuisine' : 'Quitter le mode cuisine'"
-        class="recipe-detail-cuisiner-primary"
-        size="large"
-        :severity="cookingState === 'OFF' ? 'primary' : 'secondary'"
-        aria-label="Activer ou désactiver le mode cuisine"
-        @click="toggleCookingMode"
-      />
       <ol class="prep-steps-list">
         <li
           v-for="(step, stepIndex) in selectedRecipeSteps"

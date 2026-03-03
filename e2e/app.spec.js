@@ -57,8 +57,8 @@ test.describe("Cookies & Coquillettes v1", () => {
     await page.goto("/");
     await createRecipeViaManual(page, "Recette test mode cuisine");
     await expect(page.getByRole("heading", { name: "Recette test mode cuisine" })).toBeVisible();
-    // L'overlay utilise aria-label "Lancer le mode cuisine" ; .first() = overlay (pas le bouton en bas)
-    await page.getByRole("button", { name: "Lancer le mode cuisine" }).first().click();
+    // L'overlay utilise aria-label "Cuisiner" ; .first() = overlay (pas le bouton en bas)
+    await page.getByRole("button", { name: "Cuisiner" }).first().click();
     await expect(page.locator(".message.success")).toContainText(/Wake Lock|fallback navigateur/i);
   });
 
@@ -198,7 +198,7 @@ test.describe("Cookies & Coquillettes v1", () => {
     // Pas de bouton overlay "Cuisiner" par-dessus l'embed (gêne la vidéo)
     await expect(page.locator(".recipe-detail-play-overlay")).toHaveCount(0);
 
-    // Bouton "Lancer le mode cuisine" en bas reste disponible
+    // Bouton "Cuisiner" en bas reste disponible
     await expect(page.locator(".recipe-detail-cuisiner-primary")).toBeVisible();
 
     // Ingrédients extraits depuis la description YouTube
