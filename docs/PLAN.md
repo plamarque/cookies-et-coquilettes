@@ -23,6 +23,10 @@ Exécution des slices v1 en petites livraisons verticales. Refonte UX appliquée
 | M | Images ingrédients : icônes détail + cartes, génération IA lazy, cache IndexedDB mutualisé | Fait | — |
 | N | Import URL — YouTube (description, poster, embed) | Fait | — |
 
+## Idées / backlog (hors livraison v1)
+
+- **Partage recette pair-à-pair (sans serveur de contenu)** : capture besoins et slices (QR tout-en-un vs amorce P2P), sans plan d’implémentation — voir [features/PEER_RECIPE_SHARE.md](features/PEER_RECIPE_SHARE.md). Quand priorisé : mettre à jour SPEC, DOMAIN, ARCH et ajouter un ADR.
+
 ## Definition of Done par slice
 
 - [x] Code implémenté
