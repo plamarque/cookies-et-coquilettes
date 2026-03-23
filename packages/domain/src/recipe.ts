@@ -13,10 +13,30 @@ export interface IngredientLine {
   imageId?: string;
 }
 
+/** Média persisté pour une étape (images en local, vidéos par URL). */
+export type StepMedium =
+  | { type: "image"; imageId: string }
+  | { type: "video"; url: string };
+
+/** Médias d’étape tels que renvoyés par l’import (avant téléchargement des images). */
+export type StepMediumDraft =
+  | { type: "image"; imageUrl: string }
+  | { type: "video"; url: string };
+
 export interface InstructionStep {
   id: string;
   order: number;
   text: string;
+  /** Ordre d’affichage : images (blobs) et liens vidéo. */
+  media?: StepMedium[];
+}
+
+/** Étape dans un brouillon d’import (URLs d’images distantes). */
+export interface ParsedInstructionStep {
+  id: string;
+  order: number;
+  text: string;
+  media?: StepMediumDraft[];
 }
 
 export interface ImportSource {
@@ -89,7 +109,7 @@ export interface ParsedRecipeDraft {
   category: RecipeCategory;
   servingsBase?: number;
   ingredients: IngredientLine[];
-  steps: InstructionStep[];
+  steps: ParsedInstructionStep[];
   prepTimeMin?: number;
   cookTimeMin?: number;
   restTimeMin?: number;

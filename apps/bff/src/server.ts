@@ -114,18 +114,41 @@ app.post("/api/import/screenshot", upload.single("file"), async (req, res) => {
 });
 
 app.post("/api/import/reorder-steps", async (req, res) => {
-  const steps = req.body?.steps as Array<{ id?: string; order?: number; text?: string }> | undefined;
+  const steps = req.body?.steps as
+    | Array<{
+        id?: string;
+        order?: number;
+        text?: string;
+        media?: Array<{ type: string; imageUrl?: string; url?: string }>;
+      }>
+    | undefined;
   if (!Array.isArray(steps) || steps.length === 0) {
     res.status(400).json({ error: "steps array is required" });
     return;
   }
   const normalized = steps
     .filter((s) => s && typeof s.text === "string" && s.text.trim())
-    .map((s) => ({
-      id: s.id ?? `step-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      order: typeof s.order === "number" ? s.order : 0,
-      text: String(s.text).trim()
-    }));
+    .map((s) => {
+      const rawMedia = Array.isArray(s.media) ? s.media : [];
+      const media = rawMedia
+        .map((m) => {
+          if (!m || typeof m !== "object") return null;
+          if (m.type === "image" && typeof m.imageUrl === "string" && m.imageUrl.trim()) {
+            return { type: "image" as const, imageUrl: m.imageUrl.trim() };
+          }
+          if (m.type === "video" && typeof m.url === "string" && m.url.trim()) {
+            return { type: "video" as const, url: m.url.trim() };
+          }
+          return null;
+        })
+        .filter((m): m is NonNullable<typeof m> => m !== null);
+      return {
+        id: s.id ?? `step-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        order: typeof s.order === "number" ? s.order : 0,
+        text: String(s.text).trim(),
+        ...(media.length > 0 ? { media } : {})
+      };
+    });
   const reordered = await reorderStepsByRecipeLogic(normalized);
   res.json({ steps: reordered });
 });

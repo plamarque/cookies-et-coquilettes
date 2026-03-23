@@ -17,10 +17,26 @@ export interface ImportSource {
   capturedAt: string;
 }
 
+export type StepMedium =
+  | { type: "image"; imageId: string }
+  | { type: "video"; url: string };
+
+export type StepMediumDraft =
+  | { type: "image"; imageUrl: string }
+  | { type: "video"; url: string };
+
 export interface InstructionStep {
   id: string;
   order: number;
   text: string;
+  media?: StepMedium[];
+}
+
+export interface ParsedInstructionStep {
+  id: string;
+  order: number;
+  text: string;
+  media?: StepMediumDraft[];
 }
 
 export interface ParsedRecipeDraft {
@@ -28,7 +44,7 @@ export interface ParsedRecipeDraft {
   category: RecipeCategory;
   servingsBase?: number;
   ingredients: IngredientLine[];
-  steps: InstructionStep[];
+  steps: ParsedInstructionStep[];
   prepTimeMin?: number;
   cookTimeMin?: number;
   restTimeMin?: number;

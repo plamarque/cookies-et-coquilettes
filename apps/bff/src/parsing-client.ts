@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import type { AnyNode } from "domhandler";
 import OpenAI from "openai";
 import { getChatModel } from "./ai-config.js";
 import { instagramGetUrl, type InstagramResponse } from "instagram-url-direct";
@@ -6,8 +7,9 @@ import { extractYouTubeVideoId, isYouTubeUrl } from "./youtube-utils.js";
 import type {
   IngredientLine,
   ImportType,
-  InstructionStep,
-  ParsedRecipeDraft
+  ParsedInstructionStep,
+  ParsedRecipeDraft,
+  StepMediumDraft
 } from "./types.js";
 
 export interface ParseRecipeInput {
@@ -202,21 +204,116 @@ function normalizeInstructionText(value: string): string {
   return decodeHtmlEntities(value).replace(/\s+/g, " ").trim();
 }
 
-function extractInstructionTexts(rawInstruction: unknown): string[] {
+function resolveAgainstBase(url: string, baseUrl: string): string {
+  const t = url.trim();
+  if (t.startsWith("http://") || t.startsWith("https://")) return t;
+  if (t.startsWith("//")) return `https:${t}`;
+  try {
+    return new URL(t, baseUrl).href;
+  } catch {
+    return t;
+  }
+}
+
+function dedupeUrls(urls: string[]): string[] {
+  return [...new Set(urls.filter((u) => /^https?:\/\//i.test(u)))];
+}
+
+function extractAllImageUrlsFromField(image: unknown, baseUrl: string): string[] {
+  if (!image) return [];
+  const raw: string[] = [];
+  const push = (u: string | undefined) => {
+    if (u && typeof u === "string" && u.trim()) raw.push(resolveAgainstBase(u.trim(), baseUrl));
+  };
+  if (typeof image === "string") push(image);
+  else if (Array.isArray(image)) {
+    for (const item of image) {
+      if (typeof item === "string") push(item);
+      else if (item && typeof item === "object" && "url" in item)
+        push((item as { url?: string }).url);
+    }
+  } else if (typeof image === "object" && image !== null && "url" in image) {
+    push((image as { url?: string }).url);
+  }
+  return dedupeUrls(raw);
+}
+
+function extractVideoUrlsFromField(video: unknown, baseUrl: string): string[] {
+  if (!video) return [];
+  const raw: string[] = [];
+  const push = (u: string | undefined) => {
+    if (!u || typeof u !== "string") return;
+    const t = u.trim();
+    if (!t) return;
+    const resolved =
+      t.startsWith("//")
+        ? `https:${t}`
+        : t.startsWith("http://") || t.startsWith("https://")
+          ? t
+          : /^https?:\/\//i.test(resolveAgainstBase(t, baseUrl))
+            ? resolveAgainstBase(t, baseUrl)
+            : "";
+    if (resolved && /^https?:\/\//i.test(resolved)) raw.push(resolved);
+  };
+  const visit = (v: unknown): void => {
+    if (!v) return;
+    if (typeof v === "string") {
+      push(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) visit(x);
+      return;
+    }
+    if (typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      push(typeof o.contentUrl === "string" ? o.contentUrl : undefined);
+      push(typeof o.embedUrl === "string" ? o.embedUrl : undefined);
+      const id = o["@id"];
+      if (typeof id === "string" && /^https?:\/\//i.test(id)) push(id);
+      if (o.video) visit(o.video);
+    }
+  };
+  visit(video);
+  return dedupeUrls(raw);
+}
+
+function buildMediaDraftsForInstructionNode(
+  node: Record<string, unknown>,
+  baseUrl: string
+): StepMediumDraft[] | undefined {
+  const imageUrls = extractAllImageUrlsFromField(node.image, baseUrl);
+  const videoUrls = extractVideoUrlsFromField(node.video, baseUrl);
+  const media: StepMediumDraft[] = [];
+  for (const imageUrl of imageUrls) media.push({ type: "image", imageUrl });
+  for (const url of videoUrls) media.push({ type: "video", url });
+  return media.length > 0 ? media : undefined;
+}
+
+export interface ExtractedInstructionStep {
+  text: string;
+  media?: StepMediumDraft[];
+}
+
+export function extractInstructionSteps(
+  rawInstruction: unknown,
+  baseUrl: string
+): ExtractedInstructionStep[] {
   if (typeof rawInstruction === "string") {
     const normalized = normalizeInstructionText(rawInstruction);
-    return normalized ? [normalized] : [];
+    return normalized ? [{ text: normalized }] : [];
   }
   if (Array.isArray(rawInstruction)) {
-    return rawInstruction.flatMap((entry) => extractInstructionTexts(entry));
+    return rawInstruction.flatMap((entry) => extractInstructionSteps(entry, baseUrl));
   }
   if (!rawInstruction || typeof rawInstruction !== "object") {
     return [];
   }
 
   const instructionNode = rawInstruction as Record<string, unknown>;
-  const nestedInstructionEntries = [instructionNode.itemListElement, instructionNode.item]
-    .flatMap((entry) => extractInstructionTexts(entry));
+  const nestedInstructionEntries = [instructionNode.itemListElement, instructionNode.item].flatMap(
+    (entry) => extractInstructionSteps(entry, baseUrl)
+  );
   if (nestedInstructionEntries.length > 0) {
     return nestedInstructionEntries;
   }
@@ -228,7 +325,9 @@ function extractInstructionTexts(rawInstruction: unknown): string[] {
     return [];
   }
   const normalized = normalizeInstructionText(directText);
-  return normalized ? [normalized] : [];
+  if (!normalized) return [];
+  const media = buildMediaDraftsForInstructionNode(instructionNode, baseUrl);
+  return [{ text: normalized, media }];
 }
 
 function extractImageUrl(image: SchemaRecipe["image"]): string | undefined {
@@ -244,6 +343,158 @@ function extractImageUrl(image: SchemaRecipe["image"]): string | undefined {
     return (image as { url?: string }).url;
   }
   return undefined;
+}
+
+const IMAGE_LINK_HREF_RE = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+
+function isLikelyRecipeOutroParagraph(text: string): boolean {
+  const t = text.trim();
+  if (t.length > 380) return true;
+  return /^(voilà|j'espère|j’espère|en attendant|merci\s|n'hésitez|n’hésitez)/i.test(t);
+}
+
+function isImageGalleryParagraph($: cheerio.CheerioAPI, $p: cheerio.Cheerio<AnyNode>): boolean {
+  if ($p.is("[uk-lightbox]")) return true;
+  const plain = $p.text().replace(/\s+/g, " ").trim();
+  const links = $p.find("a[href]");
+  if (links.length === 0) return false;
+  if (plain.length > 28) return false;
+  let hits = 0;
+  links.each((_, a) => {
+    const h = $(a).attr("href") ?? "";
+    if (IMAGE_LINK_HREF_RE.test(h)) hits += 1;
+  });
+  return hits > 0;
+}
+
+function collectImageUrlsFromGalleryP(
+  $: cheerio.CheerioAPI,
+  $p: cheerio.Cheerio<AnyNode>,
+  baseUrl: string
+): string[] {
+  const urls: string[] = [];
+  $p.find("a[href]").each((_, a) => {
+    const h = $(a).attr("href");
+    if (!h || !IMAGE_LINK_HREF_RE.test(h)) return;
+    const resolved = resolveAgainstBase(h.trim(), baseUrl);
+    if (/^https?:\/\//i.test(resolved)) urls.push(resolved);
+  });
+  return dedupeUrls(urls);
+}
+
+/**
+ * Best-effort : étapes en paragraphes suivies de blocs galerie (ex. WordPress + uk-lightbox).
+ * Ne remplace pas le JSON-LD ; sert à enrichir les drafts issus du LLM ou incomplets.
+ */
+export function extractHtmlInlineStepMediaSegments(
+  html: string,
+  baseUrl: string
+): Array<{ text: string; imageUrls: string[] }> {
+  const $ = cheerio.load(html);
+  const container =
+    $(".contenu_recette").first().length > 0
+      ? $(".contenu_recette").first()
+      : $(".entry-content").first().length > 0
+        ? $(".entry-content").first()
+        : $("article .post-content").first().length > 0
+          ? $("article .post-content").first()
+          : null;
+  if (!container || container.length === 0) return [];
+
+  const segments: Array<{ text: string; imageUrls: string[] }> = [];
+  let afterOutro = false;
+  container.children("p").each((_, el) => {
+    const $p = $(el);
+    if (isImageGalleryParagraph($, $p)) {
+      if (afterOutro) {
+        afterOutro = false;
+        return;
+      }
+      const urls = collectImageUrlsFromGalleryP($, $p, baseUrl);
+      if (segments.length > 0 && urls.length > 0) {
+        const last = segments[segments.length - 1]!;
+        for (const u of urls) {
+          if (!last.imageUrls.includes(u)) last.imageUrls.push(u);
+        }
+      }
+      return;
+    }
+    const text = normalizeInstructionText($p.text() ?? "");
+    if (!text || text.length < 12) return;
+    if (isLikelyRecipeOutroParagraph(text)) {
+      afterOutro = true;
+      return;
+    }
+    afterOutro = false;
+    segments.push({ text, imageUrls: [] });
+  });
+  return segments.filter((s) => s.text);
+}
+
+function mergeHtmlSegmentsIntoDraftSteps(
+  steps: ParsedInstructionStep[],
+  segments: Array<{ text: string; imageUrls: string[] }>
+): ParsedInstructionStep[] {
+  if (!segments.length || !steps.length) return steps;
+
+  if (steps.length === segments.length) {
+    return steps.map((s, i) => {
+      if (s.media?.length) return s;
+      const urls = segments[i]?.imageUrls ?? [];
+      if (!urls.length) return s;
+      return {
+        ...s,
+        media: urls.map((imageUrl) => ({ type: "image" as const, imageUrl }))
+      };
+    });
+  }
+
+  const used = new Set<number>();
+  const norm = (t: string) =>
+    t
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/\u2019|’/g, "'")
+      .trim();
+
+  return steps.map((step) => {
+    if (step.media?.length) return step;
+    const nt = norm(step.text);
+    let best = -1;
+    let bestLen = 0;
+    for (let i = 0; i < segments.length; i++) {
+      if (used.has(i)) continue;
+      const st = norm(segments[i]!.text);
+      if (st.length < 14) continue;
+      if (nt.includes(st) || st.includes(nt.slice(0, Math.min(56, nt.length)))) {
+        if (st.length > bestLen) {
+          bestLen = st.length;
+          best = i;
+        }
+      }
+    }
+    if (best < 0) return step;
+    used.add(best);
+    const urls = segments[best]!.imageUrls;
+    if (!urls.length) return step;
+    return {
+      ...step,
+      media: urls.map((imageUrl) => ({ type: "image" as const, imageUrl }))
+    };
+  });
+}
+
+function mergeHtmlInlineStepMediaIntoDraft(
+  draft: ParsedRecipeDraft,
+  html: string,
+  baseUrl: string
+): ParsedRecipeDraft {
+  const segments = extractHtmlInlineStepMediaSegments(html, baseUrl);
+  if (!segments.length) return draft;
+  const nextSteps = mergeHtmlSegmentsIntoDraftSteps(draft.steps, segments);
+  const changed = nextSteps.some((s, i) => s !== draft.steps[i]);
+  if (!changed) return draft;
+  return { ...draft, steps: nextSteps };
 }
 
 function extractRecipeFromJsonLd(html: string, baseUrl: string): ParsedRecipeDraft | null {
@@ -272,10 +523,12 @@ function extractRecipeFromJsonLd(html: string, baseUrl: string): ParsedRecipeDra
           );
 
           const rawSteps = item.recipeInstructions;
-          const steps = extractInstructionTexts(rawSteps).map((text, idx) => ({
+          const extracted = extractInstructionSteps(rawSteps, baseUrl);
+          const steps: ParsedInstructionStep[] = extracted.map((s, idx) => ({
             id: `step-${idx}-${Date.now()}`,
             order: idx + 1,
-            text
+            text: s.text,
+            ...(s.media ? { media: s.media } : {})
           }));
 
           const imageUrl = extractImageUrl(item.image);
@@ -704,8 +957,8 @@ Règles :
 }
 
 export async function reorderStepsByRecipeLogic(
-  steps: InstructionStep[]
-): Promise<InstructionStep[]> {
+  steps: ParsedInstructionStep[]
+): Promise<ParsedInstructionStep[]> {
   if (steps.length <= 1) return steps;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return steps;
@@ -745,14 +998,14 @@ ${stepTexts}`;
     if (!Array.isArray(arr) || arr.length === 0) return steps;
 
     const normalized = (t: string) => t.replace(/^\d+[\.\)\s\-:]/, "").trim().toLowerCase();
-    const remaining = new Map<string, InstructionStep>();
+    const remaining = new Map<string, ParsedInstructionStep>();
     for (const s of steps) {
       const k = normalized(s.text);
       if (!remaining.has(k)) remaining.set(k, s);
     }
 
-    const reordered: InstructionStep[] = [];
-    const used = new Set<InstructionStep>();
+    const reordered: ParsedInstructionStep[] = [];
+    const used = new Set<ParsedInstructionStep>();
 
     for (let i = 0; i < arr.length; i++) {
       const text = String(arr[i]?.text ?? "").trim();
@@ -957,12 +1210,13 @@ export async function parseRecipeWithCloud(
         } else if (twicImage) {
           jsonLdDraft.imageUrl = twicImage;
         }
-        return jsonLdDraft;
+        return mergeHtmlInlineStepMediaIntoDraft(jsonLdDraft, html, baseUrl);
       }
 
       const text = extractMainText(html);
       if (text.length > 100) {
-        return parseWithOpenAI(text, ogImage, url, sourceType, "Recette depuis URL");
+        const aiDraft = await parseWithOpenAI(text, ogImage, url, sourceType, "Recette depuis URL");
+        return mergeHtmlInlineStepMediaIntoDraft(aiDraft, html, baseUrl);
       }
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -1023,7 +1277,11 @@ export async function parseRecipeWithCloud(
           } else if (twicImage) {
             jsonLdDraft.imageUrl = twicImage;
           }
-          return withSourceType(jsonLdDraft, sourceType, url);
+          return withSourceType(
+            mergeHtmlInlineStepMediaIntoDraft(jsonLdDraft, html, url),
+            sourceType,
+            url
+          );
         }
 
         const mergedText = [input.shareTitle, input.text, extractMainText(html)]
@@ -1031,7 +1289,8 @@ export async function parseRecipeWithCloud(
           .join("\n\n");
         const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
         if (hasOpenAiKey && mergedText.length > 100) {
-          return parseWithOpenAI(mergedText, ogImage, url, sourceType);
+          const shareDraft = await parseWithOpenAI(mergedText, ogImage, url, sourceType);
+          return withSourceType(mergeHtmlInlineStepMediaIntoDraft(shareDraft, html, url), sourceType, url);
         }
       } catch (err) {
         // eslint-disable-next-line no-console

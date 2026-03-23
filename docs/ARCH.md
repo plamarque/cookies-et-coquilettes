@@ -122,7 +122,7 @@ Ordre de priorité côté BFF :
 
 1. **Scraper Instagram (`instagram-url-direct`)** — pour les URLs `instagram.com` (post/reel/tv), extraction de la caption + médias du post ; le texte est ensuite envoyé au parseur LLM, sinon fallback enrichi.
 2. **YouTube (oEmbed + description HTML)** — pour les URLs `youtube.com` / `youtu.be`, appel oEmbed (thumbnail, titre) et fetch HTML pour `og:description` ou `ytInitialPlayerResponse` ; si la description est suffisante, envoi au parseur LLM ; sinon draft avec titre + poster.
-3. **JSON-LD Schema.org** — si la page contient un bloc `application/ld+json` de type `Recipe`, extraction directe (titre, ingrédients, étapes, image, portions, temps).
+3. **JSON-LD Schema.org** — si la page contient un bloc `application/ld+json` de type `Recipe`, extraction directe (titre, ingrédients, étapes avec texte et médias d’étape en best effort : plusieurs `image` par nœud d’instruction, champs `video` / `VideoObject` avec `contentUrl` ou `embedUrl`), image principale, portions, temps.
 4. **OpenAI** — si pas de JSON-LD ou extraction incomplète : envoi du texte brut à l’API avec un prompt structuré pour remplir les champs du formulaire.
 5. **Fallback** — draft minimal éditable.
 
@@ -138,7 +138,9 @@ Le BFF expose en complément des endpoints d'administration protégés par token
 
 **Images des ingrédients** : le service `ingredient-image-service` résout l'image d'un ingrédient par son label normalisé. Si l'image n'existe pas en cache local, le BFF génère une image IA (prompt : ingrédient isolé unique, gros plan, fond blanc sans ombre, photoréaliste, lisible en petit format). L'image est stockée dans `ingredientImages` et mutualisée entre recettes. Format cible : petit (ex. 64×64 ou 96×96 px).
 
-**Images des étapes (mode cuisine)** : l'image de recette est affichée à chaque étape. Si une image d'étape existe en cache local (`cookingStepImages`, ex. anciennes générations ou futures images manuelles), elle est utilisée en priorité. La génération automatique IA n'est plus activée ; l'endpoint BFF `POST /api/generate-cooking-step-image` reste disponible pour usage manuel ou admin.
+**Médias des étapes** : chaque étape peut porter une liste ordonnée `media` (images stockées dans `db.images` comme l’illustration recette, et URLs vidéo non téléchargées). Import JSON-LD : extraction best effort des images multiples et vidéos par étape ; le front télécharge les images en arrière-plan après création de la recette. Formulaire : ajout de plusieurs images (fichier ou `POST /api/generate-cooking-step-image`) et d’URLs vidéo, réordonnancement.
+
+**Mode cuisine (affichage média)** : si l’étape a des `media`, ils sont affichés en priorité (défilement horizontal). Sinon, si une entrée existe dans `cookingStepImages` (cache historique lié au texte d’étape), elle est utilisée. Sinon, l’image recette. La génération automatique IA pendant le défilement des étapes n’est pas activée ; l’endpoint `POST /api/generate-cooking-step-image` sert notamment l’édition manuelle.
 
 Flux de résolution :
 

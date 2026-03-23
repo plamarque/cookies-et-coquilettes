@@ -2,9 +2,10 @@ import type {
   ImportService,
   ImportType,
   IngredientLine,
-  InstructionStep,
+  ParsedInstructionStep,
   ParsedRecipeDraft,
-  ShareImportPayload
+  ShareImportPayload,
+  StepMediumDraft
 } from "@cookies-et-coquilettes/domain";
 
 const API_BASE_URL = import.meta.env.VITE_BFF_URL || "http://localhost:8787";
@@ -45,6 +46,33 @@ export async function generateRecipeImage(draft: {
   } catch {
     return undefined;
   }
+}
+
+export async function generateCookingStepImage(stepText: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/generate-cooking-step-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stepText })
+    });
+    if (!response.ok) return undefined;
+    const data = (await response.json()) as { imageUrl?: string };
+    return data.imageUrl;
+  } catch {
+    return undefined;
+  }
+}
+
+function dedupeStepMediaDrafts(media: StepMediumDraft[]): StepMediumDraft[] {
+  const seen = new Set<string>();
+  const out: StepMediumDraft[] = [];
+  for (const m of media) {
+    const key = m.type === "image" ? `i:${m.imageUrl}` : `v:${m.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(m);
+  }
+  return out;
 }
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -163,7 +191,12 @@ function mergeDrafts(drafts: ParsedRecipeDraft[]): ParsedRecipeDraft {
     }
   }
 
-  const allSteps: Array<{ order: number; text: string; draftIdx: number }> = [];
+  const allSteps: Array<{
+    order: number;
+    text: string;
+    draftIdx: number;
+    media?: StepMediumDraft[];
+  }> = [];
   drafts.forEach((draft, draftIdx) => {
     let stepIdx = 0;
     for (const s of draft.steps ?? []) {
@@ -172,7 +205,8 @@ function mergeDrafts(drafts: ParsedRecipeDraft[]): ParsedRecipeDraft {
       const fromText = extractStepNumberFromText(text);
       const fromPayload = typeof s.order === "number" ? s.order : undefined;
       const orderVal = fromText ?? fromPayload ?? (draftIdx * 1000 + stepIdx);
-      allSteps.push({ order: orderVal, text, draftIdx });
+      const media = s.media?.length ? dedupeStepMediaDrafts(s.media) : undefined;
+      allSteps.push({ order: orderVal, text, draftIdx, media });
       stepIdx++;
     }
   });
@@ -180,10 +214,11 @@ function mergeDrafts(drafts: ParsedRecipeDraft[]): ParsedRecipeDraft {
     if (a.order !== b.order) return a.order - b.order;
     return a.draftIdx - b.draftIdx;
   });
-  const steps: InstructionStep[] = allSteps.map((s, idx) => ({
+  const steps: ParsedInstructionStep[] = allSteps.map((s, idx) => ({
     id: `step-${idx + 1}-${Date.now()}`,
     order: idx + 1,
-    text: s.text
+    text: s.text,
+    ...(s.media?.length ? { media: s.media } : {})
   }));
 
   return {
@@ -269,11 +304,16 @@ class BffImportService implements ImportService {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            steps: merged.steps.map((s) => ({ id: s.id, order: s.order, text: s.text }))
+            steps: merged.steps.map((s) => ({
+              id: s.id,
+              order: s.order,
+              text: s.text,
+              ...(s.media?.length ? { media: s.media } : {})
+            }))
           })
         });
         if (res.ok) {
-          const data = (await res.json()) as { steps: InstructionStep[] };
+          const data = (await res.json()) as { steps: ParsedInstructionStep[] };
           merged = { ...merged, steps: data.steps };
         }
       } catch {

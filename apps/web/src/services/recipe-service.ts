@@ -120,6 +120,13 @@ class DexieRecipeService implements RecipeService {
     for (const id of current.sourceImageIds ?? []) {
       await db.images.delete(id).catch(() => {});
     }
+    for (const step of current.steps) {
+      for (const medium of step.media ?? []) {
+        if (medium.type === "image") {
+          await db.images.delete(medium.imageId).catch(() => {});
+        }
+      }
+    }
     await deleteCookingStepImagesForRecipe(recipeId);
   }
 

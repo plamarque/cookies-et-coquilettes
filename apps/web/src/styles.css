@@ -248,6 +248,142 @@ body {
   object-fit: contain;
 }
 
+.step-media-lightbox-dialog .step-media-lightbox-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.step-media-lightbox-dialog .step-media-lightbox-img {
+  max-width: 100%;
+  max-height: 85vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.step-media-lightbox-dialog .step-media-lightbox-video-wrap {
+  width: 100%;
+  background: #0f1412;
+}
+
+.step-media-lightbox-dialog .step-media-lightbox-iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: min(75vh, 720px);
+  border: none;
+}
+
+.step-media-lightbox-dialog .step-media-lightbox-link-panel {
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.step-media-lightbox-dialog .step-media-lightbox-link-text {
+  margin: 0;
+  color: #3e4b46;
+  line-height: 1.45;
+}
+
+.prep-step-media-hit,
+.form-step-media-hit {
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prep-step-media-hit:focus-visible,
+.form-step-media-hit:focus-visible {
+  outline: 2px solid var(--p-primary-color, #1f4f46);
+  outline-offset: 2px;
+}
+
+.prep-step-media-video-shell {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+}
+
+.cooking-step-media-video-shell {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.step-media-expand-fab {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.cooking-step-media-hit {
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 0.85rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.cooking-step-media-hit--solo {
+  width: 100%;
+}
+
+.cooking-step-media-hit:focus-visible {
+  outline: 2px solid var(--p-primary-color, #1f4f46);
+  outline-offset: 2px;
+}
+
+.cooking-step-media-link--button {
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0.5rem 0.75rem;
+}
+
+.prep-step-video-link--button {
+  font: inherit;
+  color: var(--p-primary-color, #1f4f46);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  align-self: center;
+}
+
+.form-step-video-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .recipe-detail-embed-wrapper {
   width: 100%;
   max-width: 420px;
@@ -555,12 +691,14 @@ body {
 }
 
 .cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-image,
-.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-placeholder {
+.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-placeholder,
+.cooking-fullscreen-media-zone--with-timer .cooking-step-media-scroll {
   min-height: 100%;
   height: 100%;
 }
 
-.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-image {
+.cooking-fullscreen-media-zone--with-timer .cooking-fullscreen-media-image,
+.cooking-fullscreen-media-zone--with-timer .cooking-step-media-item {
   object-fit: cover;
 }
 
@@ -571,6 +709,39 @@ body {
   object-fit: cover;
   display: block;
   border-radius: 0.85rem;
+}
+
+.cooking-step-media-scroll {
+  display: flex;
+  flex-direction: row;
+  gap: 0.6rem;
+  overflow-x: auto;
+  width: 100%;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cooking-step-media-item {
+  flex: 0 0 auto;
+  width: min(100%, 420px);
+  max-height: 34vh;
+  object-fit: cover;
+}
+
+.cooking-step-media-iframe {
+  flex: 0 0 auto;
+  width: min(100%, 360px);
+  min-height: 200px;
+  max-height: 34vh;
+  border: none;
+  border-radius: 0.85rem;
+}
+
+.cooking-step-media-link {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
 }
 
 .cooking-fullscreen-media-placeholder {
@@ -1383,6 +1554,50 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.form-step-block {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(31, 79, 70, 0.1);
+}
+
+.form-step-block:last-of-type {
+  border-bottom: none;
+}
+
+.form-step-media-list {
+  margin: 0.4rem 0 0.35rem;
+}
+
+.form-step-media-row {
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.form-step-media-thumb {
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(31, 79, 70, 0.12);
+}
+
+.form-step-video-label {
+  font-size: 0.82rem;
+  color: #3e4b46;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.form-step-video-input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+}
+
 .message {
   margin-top: 0.8rem;
   padding: 0.7rem 0.9rem;
@@ -1629,6 +1844,35 @@ body {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.prep-step-media-strip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: flex-start;
+}
+
+.prep-step-media-thumb {
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(31, 79, 70, 0.15);
+}
+
+.prep-step-media-iframe {
+  width: min(100%, 320px);
+  aspect-ratio: 16 / 9;
+  border: none;
+  border-radius: 0.5rem;
+}
+
+.prep-step-video-link {
+  font-size: 0.88rem;
+  align-self: center;
 }
 
 .prep-step-ingredient-img-btn {

@@ -13,7 +13,8 @@ import type {
   Recipe,
   RecipeCategory,
   RecipeFilters,
-  ShareImportPayload
+  ShareImportPayload,
+  InstructionStep
 } from "@cookies-et-coquilettes/domain";
 import { isRecipeValidForSave } from "@cookies-et-coquilettes/domain";
 import RecipeImage from "./components/RecipeImage.vue";
@@ -21,10 +22,20 @@ import IngredientImage from "./components/IngredientImage.vue";
 import IngredientDetailModal from "./components/IngredientDetailModal.vue";
 import StepMentionedIngredientIcons from "./components/StepMentionedIngredientIcons.vue";
 import { seedIfEmpty } from "./seed/seed-if-empty";
-import { dexieRecipeService, storeImageFromFile, storeImageFromUrl } from "./services/recipe-service";
+import {
+  dexieRecipeService,
+  getImageBlobUrl,
+  storeImageFromFile,
+  storeImageFromUrl
+} from "./services/recipe-service";
 import { db } from "./storage/db";
 import { browserCookingModeService } from "./services/cooking-mode-service";
-import { bffImportService, generateRecipeImage } from "./services/import-service";
+import {
+  bffImportService,
+  generateCookingStepImage,
+  generateRecipeImage
+} from "./services/import-service";
+import { hydrateStepMediaFromDraft, resolveFormStepMediaForSave } from "./services/step-media-import";
 import {
   getCookingStepImageBlobUrl,
   resolveCookingStepImageId
@@ -32,6 +43,14 @@ import {
 import { detectStepTimerDurationSeconds } from "./services/step-timer-service";
 import { buildInstagramEmbedUrl } from "./utils/instagram-embed";
 import { buildYouTubeEmbedUrl } from "./utils/youtube-embed";
+import {
+  collectStepImageIdsFromRecipe,
+  draftsFromParsedStepMedia,
+  type FormStepMedium,
+  stepMediaToFormDrafts,
+  stepVideoEmbedSrc,
+  syncFormMediaToRecipePartial
+} from "./utils/step-media";
 import { extractStepTimerDurationSeconds } from "./utils/step-timer";
 import {
   clearShareImportParamsFromWindowLocation,
@@ -54,6 +73,7 @@ interface IngredientInput {
 interface StepInput {
   id: string;
   text: string;
+  media: FormStepMedium[];
 }
 
 interface RecipeFormState {
@@ -117,6 +137,21 @@ const recipeImageFullscreenVisible = computed({
     if (!v) recipeImageFullscreenId.value = null;
   }
 });
+
+type StepMediaLightboxState =
+  | { kind: "imageId"; imageId: string }
+  | { kind: "imageSrc"; src: string }
+  | { kind: "videoEmbed"; embedSrc: string }
+  | { kind: "videoLink"; href: string };
+
+const stepMediaLightbox = ref<StepMediaLightboxState | null>(null);
+const stepMediaLightboxVisible = computed({
+  get: () => stepMediaLightbox.value != null,
+  set: (v: boolean) => {
+    if (!v) stepMediaLightbox.value = null;
+  }
+});
+
 const imageLoadingMessage = ref<string>("");
 
 const servingsInput = ref("");
@@ -124,7 +159,17 @@ const cookingStepIndex = ref(0);
 const showCookingIngredients = ref(false);
 const cookingSwipeStartX = ref<number | null>(null);
 const currentCookingStepImageUrl = ref<string | null>(null);
+type CookingMediaRow =
+  | { type: "image"; src: string }
+  | { type: "iframe"; src: string }
+  | { type: "link"; href: string };
+const cookingStepDisplayRows = ref<CookingMediaRow[]>([]);
 let cookingStepImageLoadCounter = 0;
+
+const stepMediaFileInputRef = ref<HTMLInputElement | null>(null);
+const stepImagePickStepId = ref<string | null>(null);
+const stepVideoDraft = ref<Record<string, string>>({});
+const stepImageGeneratingStepId = ref<string | null>(null);
 const stepTimerTotalSeconds = ref<number | null>(null);
 const stepTimerRemainingSeconds = ref(0);
 const stepTimerRunning = ref(false);
@@ -174,7 +219,7 @@ function emptyIngredient(): IngredientInput {
 }
 
 function emptyStep(): StepInput {
-  return { id: randomId(), text: "" };
+  return { id: randomId(), text: "", media: [] };
 }
 
 function emptyForm(): RecipeFormState {
@@ -364,7 +409,11 @@ function toForm(recipe: Recipe): RecipeFormState {
       recipe.steps.length > 0
         ? recipe.steps
             .sort((a, b) => a.order - b.order)
-            .map((step) => ({ id: step.id, text: step.text }))
+            .map((step) => ({
+              id: step.id,
+              text: step.text,
+              media: stepMediaToFormDrafts(step.media)
+            }))
         : [emptyStep()],
     source: recipe.source,
     imageId: recipe.imageId
@@ -400,7 +449,11 @@ function draftToForm(draft: ParsedRecipeDraft): RecipeFormState {
       draft.steps.length > 0
         ? draft.steps
             .sort((a, b) => a.order - b.order)
-            .map((step) => ({ id: step.id || randomId(), text: step.text }))
+            .map((step) => ({
+              id: step.id || randomId(),
+              text: step.text,
+              media: draftsFromParsedStepMedia(step.media)
+            }))
         : [emptyStep()],
     source: draft.source
   };
@@ -478,10 +531,12 @@ function formToRecipe(existing?: Recipe): Recipe {
       if (!text) {
         return null;
       }
+      const media = syncFormMediaToRecipePartial(step.media);
       return {
         id: step.id,
         order: index + 1,
-        text
+        text,
+        ...(media ? { media } : {})
       };
     })
     .filter((step): step is NonNullable<typeof step> => step !== null);
@@ -602,6 +657,16 @@ function clearCurrentCookingStepImageUrl(): void {
     URL.revokeObjectURL(currentCookingStepImageUrl.value);
     currentCookingStepImageUrl.value = null;
   }
+}
+
+function revokeCookingStepDisplayBlobs(): void {
+  for (const row of cookingStepDisplayRows.value) {
+    if (row.type === "image" && row.src.startsWith("blob:")) {
+      URL.revokeObjectURL(row.src);
+    }
+  }
+  cookingStepDisplayRows.value = [];
+  clearCurrentCookingStepImageUrl();
 }
 
 function clearStepTimerInterval(): void {
@@ -725,13 +790,44 @@ function resetStepTimer(): void {
   stepTimerFinished.value = false;
 }
 
-async function loadCurrentCookingStepImage(): Promise<void> {
+async function loadCookingStepDisplay(): Promise<void> {
   const loadId = ++cookingStepImageLoadCounter;
-  clearCurrentCookingStepImageUrl();
+  revokeCookingStepDisplayBlobs();
 
   const recipe = selectedRecipe.value;
   const step = currentCookingStep.value;
   if (cookingState.value === "OFF" || !recipe || !step) {
+    return;
+  }
+
+  if (step.media?.length) {
+    const rows: CookingMediaRow[] = [];
+    for (const m of step.media) {
+      if (m.type === "image") {
+        const src = await getImageBlobUrl(m.imageId);
+        if (loadId !== cookingStepImageLoadCounter) {
+          if (src) URL.revokeObjectURL(src);
+          return;
+        }
+        if (src) rows.push({ type: "image", src });
+      } else {
+        const embed = stepVideoEmbedSrc(m.url);
+        if (embed) {
+          rows.push({ type: "iframe", src: embed });
+        } else {
+          rows.push({ type: "link", href: m.url });
+        }
+      }
+    }
+    if (loadId !== cookingStepImageLoadCounter) {
+      for (const row of rows) {
+        if (row.type === "image" && row.src.startsWith("blob:")) {
+          URL.revokeObjectURL(row.src);
+        }
+      }
+      return;
+    }
+    cookingStepDisplayRows.value = rows;
     return;
   }
 
@@ -1074,10 +1170,11 @@ watch(
     cookingState.value,
     selectedRecipeId.value,
     currentCookingStep.value?.id,
-    currentCookingStep.value?.text
+    currentCookingStep.value?.text,
+    JSON.stringify(currentCookingStep.value?.media ?? [])
   ],
   () => {
-    void loadCurrentCookingStepImage();
+    void loadCookingStepDisplay();
   },
   { immediate: true }
 );
@@ -1110,6 +1207,49 @@ watch(
   },
   { immediate: true }
 );
+
+watch(cookingStepIndex, () => {
+  if (stepMediaLightbox.value?.kind === "imageSrc") {
+    stepMediaLightbox.value = null;
+  }
+});
+
+watch(cookingState, (state) => {
+  if (state === "OFF" && stepMediaLightbox.value?.kind === "imageSrc") {
+    stepMediaLightbox.value = null;
+  }
+});
+
+function openStepMediaImageById(imageId: string | undefined): void {
+  if (!imageId) return;
+  stepMediaLightbox.value = { kind: "imageId", imageId };
+}
+
+function openStepMediaImageBySrc(src: string | undefined | null): void {
+  if (!src) return;
+  stepMediaLightbox.value = { kind: "imageSrc", src };
+}
+
+function openStepMediaVideoEmbed(embedSrc: string): void {
+  stepMediaLightbox.value = { kind: "videoEmbed", embedSrc };
+}
+
+function openStepMediaVideoFromUrl(rawUrl: string): void {
+  const embed = stepVideoEmbedSrc(rawUrl);
+  if (embed) {
+    stepMediaLightbox.value = { kind: "videoEmbed", embedSrc: embed };
+  } else {
+    stepMediaLightbox.value = { kind: "videoLink", href: rawUrl.trim() };
+  }
+}
+
+function openStepMediaExternalVideoInNewTab(): void {
+  const s = stepMediaLightbox.value;
+  if (s?.kind !== "videoLink") return;
+  if (typeof window !== "undefined") {
+    window.open(s.href, "_blank", "noopener,noreferrer");
+  }
+}
 
 function setError(error: unknown): void {
   errorMessage.value = error instanceof Error ? error.message : "Une erreur est survenue.";
@@ -1257,6 +1397,7 @@ async function createRecipeFromDraft(
     viewMode.value = "DETAIL";
     feedback.value = "Recette importée.";
     startAsyncImageForRecipe(recipe.id, draft);
+    void hydrateStepMediaFromDraft(recipe.id, recipe.steps, draft.steps).then(() => refresh());
   }
 }
 
@@ -1411,6 +1552,83 @@ function removeStep(id: string): void {
   if (form.value.steps.length === 0) {
     form.value.steps.push(emptyStep());
   }
+  const nextDraft = { ...stepVideoDraft.value };
+  delete nextDraft[id];
+  stepVideoDraft.value = nextDraft;
+}
+
+function triggerStepImagePick(stepId: string): void {
+  stepImagePickStepId.value = stepId;
+  stepMediaFileInputRef.value?.click();
+}
+
+async function onStepMediaFilePicked(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  const stepId = stepImagePickStepId.value;
+  stepImagePickStepId.value = null;
+  target.value = "";
+  if (!file?.type.startsWith("image/") || !stepId) return;
+  const imageId = await storeImageFromFile(file);
+  if (!imageId) return;
+  const step = form.value.steps.find((s) => s.id === stepId);
+  if (!step) return;
+  step.media.push({ type: "image", imageId });
+}
+
+function addStepVideo(stepId: string): void {
+  const url = (stepVideoDraft.value[stepId] ?? "").trim();
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+  const step = form.value.steps.find((s) => s.id === stepId);
+  if (!step) return;
+  step.media.push({ type: "video", url });
+  stepVideoDraft.value = { ...stepVideoDraft.value, [stepId]: "" };
+}
+
+function removeStepMedium(stepId: string, index: number): void {
+  const step = form.value.steps.find((s) => s.id === stepId);
+  if (!step?.media) return;
+  step.media.splice(index, 1);
+}
+
+function moveStepMedium(stepId: string, index: number, delta: number): void {
+  const step = form.value.steps.find((s) => s.id === stepId);
+  if (!step?.media) return;
+  const next = index + delta;
+  if (next < 0 || next >= step.media.length) return;
+  const [item] = step.media.splice(index, 1);
+  step.media.splice(next, 0, item);
+}
+
+async function triggerStepImageGeneration(stepId: string): Promise<void> {
+  const step = form.value.steps.find((s) => s.id === stepId);
+  if (!step?.text.trim()) return;
+  stepImageGeneratingStepId.value = stepId;
+  try {
+    const imageUrl = await generateCookingStepImage(step.text.trim());
+    if (!imageUrl) return;
+    step.media.push({ type: "image", imageUrl });
+  } finally {
+    stepImageGeneratingStepId.value = null;
+  }
+}
+
+async function buildStepsResolvedFromForm(): Promise<InstructionStep[]> {
+  const list: InstructionStep[] = [];
+  let order = 0;
+  for (const step of form.value.steps) {
+    const text = step.text.trim();
+    if (!text) continue;
+    order += 1;
+    const media = await resolveFormStepMediaForSave(step.media);
+    list.push({
+      id: step.id,
+      order,
+      text,
+      ...(media?.length ? { media } : {})
+    });
+  }
+  return list;
 }
 
 function goToCookingStep(index: number): void {
@@ -1469,12 +1687,24 @@ async function saveForm(): Promise<void> {
       formMode.value === "EDIT" && formRecipeId.value
         ? recipes.value.find((recipe) => recipe.id === formRecipeId.value)
         : undefined;
-    let recipe = formToRecipe(existing);
+    const stepsResolved = await buildStepsResolvedFromForm();
+    let recipe = {
+      ...formToRecipe(existing),
+      steps: stepsResolved
+    };
 
     if (!recipe.imageId && form.value.imageUrl) {
       const imageId = await storeImageFromUrl(form.value.imageUrl);
       if (imageId) {
         recipe = { ...recipe, imageId };
+      }
+    }
+
+    const oldStepImageIds = existing ? collectStepImageIdsFromRecipe(existing) : [];
+    const newStepImageIds = collectStepImageIdsFromRecipe(recipe);
+    for (const id of oldStepImageIds) {
+      if (!newStepImageIds.includes(id)) {
+        await db.images.delete(id).catch(() => {});
       }
     }
 
@@ -1759,7 +1989,7 @@ onUnmounted(() => {
   stepTimerDetectionCounter += 1;
   clearStepTimerInterval();
   cookingStepImageLoadCounter += 1;
-  clearCurrentCookingStepImageUrl();
+  revokeCookingStepDisplayBlobs();
   if (typeof document !== "undefined") {
     document.body.style.overflow = "";
   }
@@ -1784,6 +2014,44 @@ onUnmounted(() => {
           :image-id="recipeImageFullscreenId"
           alt="Image de la recette en plein écran"
           img-class="recipe-image-fullscreen-img"
+        />
+      </div>
+    </Dialog>
+    <Dialog
+      v-model:visible="stepMediaLightboxVisible"
+      modal
+      :header="undefined"
+      :closable="true"
+      :dismissable-mask="true"
+      :style="{ width: '95vw', maxWidth: '960px' }"
+      :content-style="{ padding: 0, overflow: 'hidden' }"
+      class="step-media-lightbox-dialog"
+    >
+      <div v-if="stepMediaLightbox?.kind === 'imageId'" class="step-media-lightbox-content">
+        <RecipeImage
+          :image-id="stepMediaLightbox.imageId"
+          alt="Image de l'étape"
+          img-class="step-media-lightbox-img"
+        />
+      </div>
+      <div v-else-if="stepMediaLightbox?.kind === 'imageSrc'" class="step-media-lightbox-content">
+        <img :src="stepMediaLightbox.src" alt="" class="step-media-lightbox-img" />
+      </div>
+      <div v-else-if="stepMediaLightbox?.kind === 'videoEmbed'" class="step-media-lightbox-video-wrap">
+        <iframe
+          :src="stepMediaLightbox.embedSrc"
+          title="Vidéo de l'étape"
+          class="step-media-lightbox-iframe"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+        />
+      </div>
+      <div v-else-if="stepMediaLightbox?.kind === 'videoLink'" class="step-media-lightbox-link-panel">
+        <p class="step-media-lightbox-link-text">Cette vidéo ne peut pas être intégrée ici.</p>
+        <Button
+          label="Ouvrir la vidéo"
+          icon="pi pi-external-link"
+          @click="openStepMediaExternalVideoInNewTab"
         />
       </div>
     </Dialog>
@@ -2003,17 +2271,80 @@ onUnmounted(() => {
             class="cooking-fullscreen-media-zone"
             :class="{ 'cooking-fullscreen-media-zone--with-timer': hasCurrentStepTimer }"
           >
-            <img
-              v-if="currentCookingStepImageUrl"
-              :src="currentCookingStepImageUrl"
-              alt="Illustration de l'étape"
-              class="cooking-fullscreen-media-image"
-            />
-            <RecipeImage
+            <div
+              v-if="cookingStepDisplayRows.length"
+              class="cooking-step-media-scroll"
+              aria-label="Médias de l'étape"
+            >
+              <template v-for="(row, ri) in cookingStepDisplayRows" :key="ri">
+                <button
+                  v-if="row.type === 'image'"
+                  type="button"
+                  class="cooking-step-media-hit"
+                  aria-label="Agrandir l'image"
+                  @click="openStepMediaImageBySrc(row.src)"
+                >
+                  <img
+                    :src="row.src"
+                    alt=""
+                    class="cooking-fullscreen-media-image cooking-step-media-item"
+                  />
+                </button>
+                <div v-else-if="row.type === 'iframe'" class="cooking-step-media-video-shell">
+                  <iframe
+                    :src="row.src"
+                    title="Vidéo de l'étape"
+                    class="cooking-step-media-iframe"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen
+                  />
+                  <Button
+                    type="button"
+                    rounded
+                    text
+                    severity="contrast"
+                    class="step-media-expand-fab"
+                    icon="pi pi-window-maximize"
+                    aria-label="Agrandir la vidéo"
+                    @click="openStepMediaVideoEmbed(row.src)"
+                  />
+                </div>
+                <button
+                  v-else
+                  type="button"
+                  class="cooking-step-media-link cooking-step-media-link--button"
+                  @click="openStepMediaVideoFromUrl(row.href)"
+                >
+                  Ouvrir la vidéo
+                </button>
+              </template>
+            </div>
+            <button
+              v-else-if="currentCookingStepImageUrl"
+              type="button"
+              class="cooking-step-media-hit cooking-step-media-hit--solo"
+              aria-label="Agrandir l'image"
+              @click="openStepMediaImageBySrc(currentCookingStepImageUrl)"
+            >
+              <img
+                :src="currentCookingStepImageUrl"
+                alt="Illustration de l'étape"
+                class="cooking-fullscreen-media-image"
+              />
+            </button>
+            <button
               v-else-if="selectedRecipe.imageId"
-              :image-id="selectedRecipe.imageId"
-              img-class="cooking-fullscreen-media-image"
-            />
+              type="button"
+              class="cooking-step-media-hit cooking-step-media-hit--solo"
+              aria-label="Agrandir l'image de la recette"
+              @click="openStepMediaImageById(selectedRecipe.imageId)"
+            >
+              <RecipeImage
+                :image-id="selectedRecipe.imageId"
+                img-class="cooking-fullscreen-media-image"
+              />
+            </button>
             <div v-else class="cooking-fullscreen-media-placeholder">
               <p>Ajoutez une image pour avoir un repère visuel pendant la cuisine.</p>
               <Button
@@ -2425,6 +2756,50 @@ onUnmounted(() => {
               />
             </div>
           </div>
+          <div v-if="step.media?.length" class="prep-step-media-strip">
+            <template v-for="(m, mi) in step.media" :key="mi">
+              <button
+                v-if="m.type === 'image'"
+                type="button"
+                class="prep-step-media-hit"
+                aria-label="Agrandir l'image de l'étape"
+                @click="openStepMediaImageById(m.imageId)"
+              >
+                <RecipeImage :image-id="m.imageId" img-class="prep-step-media-thumb" />
+              </button>
+              <div
+                v-else-if="stepVideoEmbedSrc(m.url)"
+                class="prep-step-media-video-shell"
+              >
+                <iframe
+                  :src="stepVideoEmbedSrc(m.url)"
+                  title="Vidéo de l'étape"
+                  class="prep-step-media-iframe"
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                />
+                <Button
+                  type="button"
+                  rounded
+                  text
+                  severity="secondary"
+                  class="step-media-expand-fab"
+                  icon="pi pi-window-maximize"
+                  aria-label="Agrandir la vidéo"
+                  @click="openStepMediaVideoEmbed(stepVideoEmbedSrc(m.url)!)"
+                />
+              </div>
+              <button
+                v-else
+                type="button"
+                class="prep-step-video-link prep-step-video-link--button"
+                @click="openStepMediaVideoFromUrl(m.url)"
+              >
+                Voir la vidéo
+              </button>
+            </template>
+          </div>
         </li>
       </ol>
     </section>
@@ -2660,15 +3035,128 @@ onUnmounted(() => {
       <Button text icon="pi pi-plus" label="Ajouter ingrédient" @click="addIngredient" />
 
       <h3>Préparation</h3>
-      <div v-for="step in form.steps" :key="step.id" class="step-row">
-        <textarea
-          v-model="step.text"
-          rows="3"
-          placeholder="Décris l'étape"
-          :aria-label="`step-text-${step.id}`"
-        />
-        <Button text icon="pi pi-trash" @click="removeStep(step.id)" />
+      <div v-for="step in form.steps" :key="step.id" class="form-step-block">
+        <div class="step-row">
+          <textarea
+            v-model="step.text"
+            rows="3"
+            placeholder="Décris l'étape"
+            :aria-label="`step-text-${step.id}`"
+          />
+          <Button text icon="pi pi-trash" @click="removeStep(step.id)" />
+        </div>
+        <div v-if="step.media.length" class="form-step-media-list">
+          <div
+            v-for="(medium, mi) in step.media"
+            :key="mi"
+            class="form-step-media-row row"
+          >
+            <button
+              v-if="medium.type === 'image' && medium.imageId"
+              type="button"
+              class="form-step-media-hit"
+              aria-label="Agrandir l'image"
+              @click="openStepMediaImageById(medium.imageId)"
+            >
+              <RecipeImage :image-id="medium.imageId" img-class="form-step-media-thumb" />
+            </button>
+            <button
+              v-else-if="medium.type === 'image' && medium.imageUrl"
+              type="button"
+              class="form-step-media-hit"
+              aria-label="Agrandir l'image"
+              @click="openStepMediaImageBySrc(medium.imageUrl)"
+            >
+              <img :src="medium.imageUrl" alt="" class="form-step-media-thumb" />
+            </button>
+            <div v-else-if="medium.type === 'video'" class="form-step-video-row">
+              <span class="form-step-video-label">{{ medium.url }}</span>
+              <Button
+                type="button"
+                text
+                size="small"
+                icon="pi pi-window-maximize"
+                aria-label="Agrandir la vidéo"
+                @click="openStepMediaVideoFromUrl(medium.url)"
+              />
+            </div>
+            <div class="row form-step-media-actions">
+              <Button
+                v-if="mi > 0"
+                text
+                size="small"
+                icon="pi pi-arrow-up"
+                aria-label="Monter"
+                @click="moveStepMedium(step.id, mi, -1)"
+              />
+              <Button
+                v-if="mi < step.media.length - 1"
+                text
+                size="small"
+                icon="pi pi-arrow-down"
+                aria-label="Descendre"
+                @click="moveStepMedium(step.id, mi, 1)"
+              />
+              <Button
+                text
+                size="small"
+                severity="secondary"
+                icon="pi pi-times"
+                label="Retirer"
+                @click="removeStepMedium(step.id, mi)"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="row form-step-media-toolbar" style="flex-wrap: wrap; gap: 0.5rem">
+          <Button
+            text
+            size="small"
+            icon="pi pi-upload"
+            label="Ajouter une image"
+            @click="triggerStepImagePick(step.id)"
+          />
+          <Button
+            text
+            size="small"
+            icon="pi pi-sparkles"
+            label="Générer une image"
+            :loading="stepImageGeneratingStepId === step.id"
+            :disabled="!step.text.trim()"
+            @click="triggerStepImageGeneration(step.id)"
+          />
+        </div>
+        <div class="row form-step-video-add" style="gap: 0.5rem; flex-wrap: wrap; margin-top: 0.35rem">
+          <input
+            :value="stepVideoDraft[step.id] ?? ''"
+            type="url"
+            class="form-step-video-input"
+            placeholder="https://… (vidéo)"
+            :aria-label="`Vidéo pour l'étape ${step.id}`"
+            @input="
+              stepVideoDraft = {
+                ...stepVideoDraft,
+                [step.id]: ($event.target as HTMLInputElement).value
+              }
+            "
+          />
+          <Button
+            text
+            size="small"
+            icon="pi pi-link"
+            label="Ajouter la vidéo"
+            @click="addStepVideo(step.id)"
+          />
+        </div>
       </div>
+      <input
+        ref="stepMediaFileInputRef"
+        type="file"
+        accept="image/*"
+        class="hidden-file-input"
+        aria-hidden="true"
+        @change="onStepMediaFilePicked"
+      />
       <Button text icon="pi pi-plus" label="Ajouter étape" @click="addStep" />
 
       <div class="row form-footer-actions">

@@ -55,6 +55,13 @@ Attributs :
 - `id`
 - `order`
 - `text`
+- `media` (optionnel) : liste ordonnée de médias d’étape — image (`RecipeImage` via `imageId` dans IndexedDB) ou vidéo (URL absolue `http(s)` uniquement, non téléchargée).
+
+Types de médias : `StepMedium` = entrée `{ type: 'image', imageId }` ou `{ type: 'video', url }`.
+
+### ParsedInstructionStep (brouillon d’import)
+
+Même structure qu’une étape pour le flux BFF → client avant persistance : les images sont des URL distantes (`imageUrl`) dans le brouillon, converties en `imageId` local après téléchargement.
 
 ### RecipeImage
 
@@ -96,6 +103,7 @@ Attributs :
 3. Une `Recipe` peut référencer `0..1` `RecipeImage`.
 4. Une `Recipe` peut référencer `0..1` `ImportSource`.
 5. Une `IngredientLine` peut référencer `0..1` `IngredientImage` (via `imageId` ou résolution par label normalisé).
+6. Une `InstructionStep` peut référencer `0..N` images recette (`RecipeImage` / `db.images`) et `0..N` liens vidéo via `media`.
 
 ## Règles du domaine
 

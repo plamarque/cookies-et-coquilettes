@@ -40,10 +40,11 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 1. L’utilisateur peut saisir une recette entièrement à la main.
 2. L’utilisateur peut importer une recette via partage système (si navigateur/OS compatibles), ou depuis l'écran « Nouvelle recette » : collage (URL/texte/image) + Importer, ou choix fichier, ou saisie manuelle.
 3. Toute recette importée est créée immédiatement et affichée ; l'utilisateur peut l'éditer à tout moment si besoin.
-4. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement via l'édition.
-5. Pendant l’import (URL, texte ou image), l’interface affiche un état d’attente explicite indiquant l’analyse en cours.
-6. La provenance (`source`) est conservée pour tout import, même sans URL (ex. image collée).
-7. Pour un import YouTube ou Instagram (post/reel), l'application extrait la recette depuis la description (caption), capture le poster (thumbnail) et affiche l'embed vidéo dans la vue détail et le formulaire d'édition ; le poster est réservé aux cartes de l'écran d'accueil. Le bouton overlay « Cuisiner » est masqué sur les embeds vidéo pour ne pas gêner la lecture.
+4. Lorsque la source structurée (ex. JSON-LD) fournit plusieurs images ou une vidéo par étape, l'application tente de les extraire et de les associer à l'étape correspondante (best effort) ; les images sont téléchargées en arrière-plan.
+5. Si le BFF est indisponible ou l’extraction échoue, l’application crée un draft minimal (titre + provenance) à compléter manuellement via l'édition.
+6. Pendant l’import (URL, texte ou image), l’interface affiche un état d’attente explicite indiquant l’analyse en cours.
+7. La provenance (`source`) est conservée pour tout import, même sans URL (ex. image collée).
+8. Pour un import YouTube ou Instagram (post/reel), l'application extrait la recette depuis la description (caption), capture le poster (thumbnail) et affiche l'embed vidéo dans la vue détail et le formulaire d'édition ; le poster est réservé aux cartes de l'écran d'accueil. Le bouton overlay « Cuisiner » est masqué sur les embeds vidéo pour ne pas gêner la lecture.
 
 ### Organisation et recherche rapide
 
@@ -56,12 +57,12 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 ### Consultation et exécution
 
 1. Les vignettes (cartes) affichent la photo de la recette lorsqu'elle existe.
-2. L'écran détail affiche l'image en en-tête, puis ingrédients (grille avec images), quantités, portions et préparation (étapes ordonnées avec icônes des ingrédients mentionnés en bout de ligne, au plus trois visibles par étape ; au-delà, une indication « +x » sur la troisième icône ouvre une popin listant tous les ingrédients de l'étape). En mode cuisine, la bande d'ingrédients de l'étape courante suit la même règle.
+2. L'écran détail affiche l'image en en-tête, puis ingrédients (grille avec images), quantités, portions et préparation (étapes ordonnées avec icônes des ingrédients mentionnés en bout de ligne, au plus trois visibles par étape ; au-delà, une indication « +x » sur la troisième icône ouvre une popin listant tous les ingrédients de l'étape). Sous chaque étape, lorsqu'ils existent, les médias d'étape s'affichent dans l'ordre : plusieurs images (vignettes / défilement) et liens ou embeds vidéo (YouTube, Instagram, Vimeo en embed si reconnu, sinon lien externe). En mode cuisine, la bande d'ingrédients de l'étape courante suit la même règle.
 3. L'utilisateur peut modifier les portions ; les quantités sont recalculées immédiatement.
 4. L'utilisateur peut réinitialiser les portions à la valeur de base.
 5. Le mode cuisine (anti-veille) est activable uniquement depuis l'écran détail d'une recette ouverte.
 6. En mode cuisine, les actions `Précédente` / `Suivante` restent toujours visibles en bas d'écran ; seul le texte de l'étape défile.
-7. En mode cuisine, l'image affichée tente d'abord une illustration IA basée sur le texte de l'étape ; l'image recette reste le fallback immédiat.
+7. En mode cuisine, la zone média affiche d'abord les médias explicites de l'étape (images locales et vidéos intégrées ou en lien) ; à défaut, une image d'étape en cache local historique (`cookingStepImages`) si elle existe ; sinon l'image recette ; sinon invite à ajouter une image.
 8. En mode cuisine, si le texte d'une étape mentionne (explicitement ou implicitement) une durée de cuisson/repos, l'UI propose un timer countdown prérempli ; l'utilisateur le déclenche manuellement. La durée est déterminée par détection sémantique (IA, avec fallback local en cas d'indisponibilité). Le timer affiche le temps restant et une progression circulaire semi-transparente décroissante (sens horaire), puis émet un court signal sonore de fin.
 9. À la sortie du mode cuisine, l'application affiche le temps passé et propose de mettre à jour `prepTimeMin` en prenant la moyenne entre le temps mesuré et la valeur existante de la recette.
 
@@ -89,6 +90,7 @@ Problème utilisateur adressé en priorité : ne plus devoir re-chercher les rec
 1. Toute recette peut être modifiée à tout moment.
 2. Les modifications sont persistées localement à l’action explicite de sauvegarde.
 3. La suppression est irréversible après confirmation utilisateur.
+4. Pour chaque étape, l'utilisateur peut ajouter ou retirer plusieurs images (fichier ou génération IA comme pour l'illustration recette), ordonner les médias, et ajouter une ou plusieurs URLs vidéo (`http` ou `https`).
 
 ## Critères de succès v1
 
